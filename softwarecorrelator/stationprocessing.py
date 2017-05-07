@@ -1,8 +1,8 @@
 import numpy
-import numpy.fft as fft
+import scipy.fftpack as fft
 import scipy.signal as signal
 
-def fir_filter_coefficients(num_chan, num_taps):
+def fir_filter_coefficients(num_chan, num_taps, cal_factor=1./numpy.sqrt(1.8e1)):
     '''
     Compute FIR filter coefficients for channel separation.
 
@@ -16,7 +16,7 @@ def fir_filter_coefficients(num_chan, num_taps):
 
     **Returns**
 
-    A num_taps x num_chan numpy.array of 32 bit floats.
+    A num_taps x num_chan numpy.array of float32.
 
     **Example**
 
@@ -36,20 +36,55 @@ def fir_filter_coefficients(num_chan, num_taps):
     auto_fftshift = raw_coefficients*(-1)**numpy.arange(num_taps*num_chan)
     coefficients = numpy.array(auto_fftshift*(num_chan**1.5),
                                dtype=numpy.float32)
-    coefficients /= numpy.sqrt(1.8e1),
+    coefficients *= cal_factor
     return coefficients.reshape((num_taps, num_chan))
 
 
 
 
-def channelize_ppf(blocks, fir_coefficients):
-    '''FIR coefficients as well as blocks are num_taps x num_chan arrays'''
-    return (fft.ifft((blocks*fir_coefficients).sum(axis=0)))
+def channelize_ppf(timeseries_taps, fir_coefficients):
+    '''
+    Make a polyphase-filtered spectrum of a timeseries.
+    
+    **Parameters**
+
+    timeseries_taps : 2D numpy.array of complex64
+        A `num_taps x num_chan` array containing the timeseries data,
+        where `timeseries_taps.ravel()` should yield the input (single
+        channel) timeseries data.
+
+    fir_coefficients : 2D numpy.array of float32
+        A `num_taps x num_chan` array containing the FIR coefficients,
+        where `fir_coefficients.ravel()` should yield the FIR filter to
+        multiply with the original (single channel) timeseries data.
+
+    **Returns**
+
+    A 1D numpy.array of complex64 with length num_chan containing the
+    PPF output.
+
+    **Example**
+    
+    >>> fir = fir_filter_coefficients(num_chan=4, num_taps=2, cal_factor=1)
+    >>> fir.dtype
+    dtype('float32')
+    >>> timeseries = numpy.array(numpy.exp(2j*numpy.pi*2.8*numpy.arange(8)),
+    ...                          dtype=numpy.complex64)
+    >>> timeseries
+    array([ 1.000000 +0.00000000e+00j,  0.309017 -9.51056540e-01j,
+           -0.809017 -5.87785244e-01j, -0.809017 +5.87785244e-01j,
+            0.309017 +9.51056540e-01j,  1.000000 -3.42901108e-15j,
+            0.309017 -9.51056540e-01j, -0.809017 -5.87785244e-01j], dtype=complex64)
+    >>> spectrum = channelize_ppf(timeseries.reshape(fir.shape), fir)
+    >>> spectrum
+    array([-0.03263591-0.01060404j, -0.00383157+0.00195229j,
+           -0.00848089+0.02610143j,  0.78864020+1.54779351j], dtype=complex64)
+    '''
+    return (fft.ifft((timeseries_taps*fir_coefficients).sum(axis=0)))
 
 
 
-def channelize_ppf_multi_ts(blocks, fir_coefficients):
-    '''FIR coefficients are num_tapsxnum_chan, blocks are num_timeslots x num_taps x num_chan arrays'''
-#    return array([channelize_ppf(block, fir_coefficients) for block in blocks], dtype=complex64)
-    return (fft.ifft((blocks*fir_coefficients[newaxis,:,:]).sum(axis=1),
+def channelize_ppf_multi_ts(timeseries_taps, fir_coefficients):
+    '''FIR coefficients are num_taps x num_chan, blocks are num_timeslots x num_taps x num_chan arrays'''
+    return (fft.ifft((timeseries_taps*fir_coefficients[numpy.newaxis,:,:]).sum(axis=1),
                       axis=1))
