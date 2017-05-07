@@ -1,10 +1,13 @@
 import numpy
 import h5py
 import logging
+import glob
 import matplotlib.pyplot as plt
 
 from .utilities import working_dir
 from .lofarhdf5 import h5_structure, h5_complex_voltage_file_names
+from .lofarhdf5 import read_timeseries_subsampled
+from .stationprocessing import fir_filter_coefficients, channelize_ppf
 
 
 
@@ -67,3 +70,73 @@ def data_loss_report_plot(dir_name):
     plt.ylabel('Antenna')
     plt.title('Data loss %s: %.1f%% total' % (file_names['x_re'][0].split('_')[0], max_losses.mean()*100))
     plt.grid(axis='x')
+
+
+
+
+
+
+
+
+
+def subsampled_dynamic_spectra_by_timeslot(dir_name, sas_id=None,
+                                           sap_ids=range(48), 
+                                           num_chan=256,
+                                           num_taps=16,
+                                           interval_s=0.1):
+    '''
+    Return subsampled complex valued dynamic spectra for all antennas
+    and subbands in directory `dir_name`.
+
+    **Parameters**
+
+
+    **Returns**
+
+    A tuple XX, YY, time_s, freq_axis. Here, XX and YY are 4D
+    numpy.arrays of complex64 with indices [antenna, subband,
+    time slot, channel], time_s is the time since obervation start for
+    each time slot, and freq_axis is a dict containing all the
+    frequency information. The subband frequencies are found in
+    freq_axis['AXIS_VALUES_WORLD'].
+    '''
+    fir_coef = fir_filter_coefficients(num_chan, num_taps)
+    if sas_id is None:
+        with working_dir(dir_name):
+            names = glob.glob('*.h5')
+        unique_names = numpy.unique([name[:8] for name in names])
+        if len(unique_names) == 1 and unique_names[0][0] == 'L':
+            try:
+                sas_nr = int(unique_names[0].lstrip('L').rstrip('_'))
+            except:
+                logging.warning('%s might not be valid SAS ID.', unique_names[0].rstrip('_'))
+            sas_id = unique_names[0].rstrip('_')
+    if sas_id is None:
+        raise ValueError('Unable to find SAS ID.')
+    time_s = []
+    xx = []
+    yy = []
+    report_interval_s = 2.0
+    next_report_s = 0.0
+    for i, (x, y, time_axis, freq_axis) in enumerate(read_timeseries_subsampled(
+            dir_name, sas_id,
+            sap_ids,
+            interval_s=interval_s,
+            num_samples=num_taps*num_chan)):
+        x = x.transpose(0,2,1)
+        xx.append([[channelize_ppf(x[ant, sb, :].reshape((num_taps, num_chan)), fir_coef)
+                   for sb in range(x.shape[1])]
+                   for ant in range(x.shape[0])])
+        y = y.transpose(0,2,1)
+        yy.append([[channelize_ppf(y[ant, sb, :].reshape((num_taps, num_chan)), fir_coef)
+                   for sb in range(y.shape[1])]
+                   for ant in range(y.shape[0])])
+        time_s.append(time_axis['REFERENCE_VALUE'])
+
+        if time_s[-1] > next_report_s:
+            next_report_s += report_interval_s
+            print(time_s[-1])
+    xx = numpy.array(xx, dtype=numpy.complex64).transpose(1,2,0,3).copy(order='C')
+    yy = numpy.array(yy, dtype=numpy.complex64).transpose(1,2,0,3).copy(order='C')
+    time_s = numpy.array(time_s)
+    return xx, yy, time_s, freq_axis
