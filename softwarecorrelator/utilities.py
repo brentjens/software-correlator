@@ -8,12 +8,14 @@ class working_dir(object):
     
     **Example**
     
-    >>> def hdf5_file_names(dir_name):
-    >>>     with working_dir(dir_name):
-    >>>         hdf5_file_names = glob.glob('*.h5')
-    >>>
-    >>> hdf5_file_names('testdata/L590569-LBA_OUTER-20170501/')
-    >>>
+    >>> initial_dir = os.getcwd()
+    >>> os.path.relpath(start=initial_dir, path=os.getcwd())
+    '.'
+    >>> with working_dir('testdata/'):
+    ...     os.path.relpath(start=initial_dir, path=os.getcwd())
+    'testdata'
+    >>> os.path.relpath(start=initial_dir, path=os.getcwd())
+    '.'
     '''
     def __init__(self, dir_name):
         self.working_dir_name = dir_name
