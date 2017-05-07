@@ -1,8 +1,10 @@
 import numpy
+import h5py
+import logging
 
 from .utilities import working_dir
 from .lofarhdf5 import h5_structure, h5_complex_voltage_file_names
-import h5py
+
 
 
 
@@ -17,17 +19,19 @@ def data_loss_fraction(dir_name, hdf5_name,
         return numpy.sum(subset == 0.0)/numpy.product(subset.shape)    
 
 
-def data_loss_report(dir_name):
+def data_loss_report_ascii(dir_name):
     file_names = h5_complex_voltage_file_names(dir_name)
     losses = []
     for pol in ['x_re', 'x_im', 'y_re', 'y_im']:
         losses.append(numpy.array([data_loss_fraction(dir_name, file_name)
-                                   for file_name in file_names['x_re']]))
-    print('====================================================================')
+                                   for file_name in sorted(file_names[pol])]))
+    losses = (numpy.array(losses).T).tolist()
+    logging.debug(losses)
+    print('============================================================================')
     print('                            DATA LOSS [%]')
-    print('====================================================================')
-    print('NAME                                 X_RE     X_IM     Y_RE     Y_IM')
-    print('--------------------------------------------------------------------')
-    for row in zip(file_names['x_re'], *losses):
-        print(row[0], '  %5.1f    %5.1f    %5.1f    %5.1f' % tuple(numpy.array(row[1:])*100))
-    print('====================================================================')
+    print('============================================================================')
+    print('NAME                                 X_RE     X_IM     Y_RE     Y_IM     MAX')
+    print('----------------------------------------------------------------------------')
+    for row in zip(file_names['x_re'], losses):
+        print(row[0], '  %5.1f    %5.1f    %5.1f    %5.1f   %5.1f' % (tuple(numpy.array(row[1])*100) + (numpy.array(row[1]).max()*100,)))
+    print('============================================================================')
