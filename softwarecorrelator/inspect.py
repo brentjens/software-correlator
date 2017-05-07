@@ -12,7 +12,7 @@ def data_loss_fraction(dir_name, hdf5_name,
         h5 = h5py.File(hdf5_name)
         h5_data_path = [n for n in h5_structure(h5) if 'STOKES' in n][0]
         num_samples = int(1/(detection_threshold*fractional_error_at_threshold**2))
-        sub_sampling = int(product(h5[h5_data_path].shape)//num_samples)
+        sub_sampling = int(numpy.product(h5[h5_data_path].shape)//num_samples)
         subset = h5[h5_data_path][::sub_sampling,:]
         return numpy.sum(subset == 0.0)/numpy.product(subset.shape)    
 
@@ -29,5 +29,5 @@ def data_loss_report(dir_name):
     print('NAME                                 X_RE     X_IM     Y_RE     Y_IM')
     print('--------------------------------------------------------------------')
     for row in zip(file_names['x_re'], *losses):
-        print(row[0], '  %5.1f    %5.1f    %5.1f    %5.1f' % tuple(array(row[1:])*100))
+        print(row[0], '  %5.1f    %5.1f    %5.1f    %5.1f' % tuple(numpy.array(row[1:])*100))
     print('====================================================================')
