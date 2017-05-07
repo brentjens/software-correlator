@@ -16,7 +16,7 @@
 # fi;
 
 
-cd doc && make html && cd ..
+# cd doc && make html && cd ..
 
 PYTHONPATH="`pwd`:$PYTHONPATH"
 NOSETESTS=`which nosetests`
@@ -31,7 +31,7 @@ if [[ ! -f "$NOSETESTS" ]] ; then
 else
    echo "Using $NOSETESTS"
     $NOSETESTS --with-doctest --with-coverage \
-               --cover-package="stationcorrelator,test" \
+               --cover-package="softwarecorrelator,test" \
                --cover-tests \
                --cover-html \
                --cover-html-dir=coverage \
