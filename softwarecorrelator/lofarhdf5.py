@@ -87,6 +87,121 @@ def h5_format_beam_header(h5file):
                             key=lambda x: x.split(':')[0].strip()))
 
 
+
+def read_timeseries_subsampled_by_sap(dir_name, sas_id_string, sap_ids, interval_s=0.1,
+                               interval_samples=None, num_samples=256*16):
+    sap_names = [[('%s_SAP%03d_B000_S%d_P000_bf.h5' % (sas_id_string, sap_id, pol))
+                  for pol in [0, 1, 2, 3]]
+                 for sap_id in sap_ids]
+    sap_fmt = 'SUB_ARRAY_POINTING_%03d/BEAM_000/STOKES_%d'
+    coordinate_fmt = 'SUB_ARRAY_POINTING_%03d/BEAM_000/COORDINATES/COORDINATE_%d'
+    with working_dir(dir_name):
+        h5_files_by_sap = [[h5py.File(file_name) for file_name in names]
+                           for names in sap_names]
+        time_axis, freq_axis = [
+            dict([i for i in h5_files_by_sap[0][0][coordinate_fmt % (sap_ids[0], axis_id)].attrs.items()])
+                    for axis_id in [0, 1]]
+        sample_duration_s = time_axis['INCREMENT']
+        if interval_samples is None:
+            samples_per_interval = int(numpy.floor(interval_s/sample_duration_s))
+        else:
+            samples_per_interval = interval_samples
+
+        for sap_id, sap_files in zip(sap_ids, h5_files_by_sap):
+            timeslots_per_file = sap_files[0][sap_fmt % (sap_id, 0)].shape[0]
+            first_timeslot = 0
+            time_series_complex_x = []
+            time_series_complex_y = []
+            time_axis['INCREMENT'] = samples_per_interval*sample_duration_s
+            h5_groups = [h5_file[sap_fmt % (sap_id, pol)]
+                          for pol, h5_file in enumerate(sap_files)]
+
+            num_sb = len(freq_axis['AXIS_VALUES_WORLD'])
+            num_timeslots = (timeslots_per_file-num_samples) // samples_per_interval
+            time_series_real = numpy.zeros((4, num_samples, num_sb), dtype=numpy.float32)
+
+            time_series_complex_x = numpy.zeros((num_timeslots, num_samples, num_sb), dtype=numpy.complex64)
+            time_series_complex_y = numpy.zeros((num_timeslots, num_samples, num_sb), dtype=numpy.complex64)
+
+            timeslot = 0
+            while first_timeslot < timeslots_per_file - samples_per_interval - num_samples:
+                [h5_groups[pol].read_direct(time_series_real,
+                                            numpy.s_[first_timeslot:first_timeslot+num_samples,:],
+                                            numpy.s_[pol,:, :])
+                                          for pol in range(4)] #, h5_file in enumerate(sap_files)],
+                time_series_complex_x[timeslot,:,:] += (time_series_real[0,:,:] + 1j*time_series_real[1,:,:])
+                time_series_complex_y[timeslot,:,:] += (time_series_real[2,:,:] + 1j*time_series_real[3,:,:])
+                first_timeslot += samples_per_interval
+                timeslot += 1
+            yield (time_series_complex_x,
+                   time_series_complex_y,
+                   time_axis, freq_axis)
+
+
+def read_timeseries_subsampled(dir_name, sas_id_string, sap_ids, interval_s=0.1,
+                               interval_samples=None, num_samples=256*16):
+    sap_names = [[('%s_SAP%03d_B000_S%d_P000_bf.h5' % (sas_id_string, sap_id, pol))
+                  for pol in [0, 1, 2, 3]]
+                 for sap_id in sap_ids]
+    sap_fmt = 'SUB_ARRAY_POINTING_%03d/BEAM_000/STOKES_%d'
+    coordinate_fmt = 'SUB_ARRAY_POINTING_%03d/BEAM_000/COORDINATES/COORDINATE_%d'
+    with working_dir(dir_name):
+        h5_files_by_sap = [[h5py.File(file_name) for file_name in names]
+                           for names in sap_names]
+        time_axis, freq_axis = [
+            dict([i for i in h5_files_by_sap[0][0][coordinate_fmt % (sap_ids[0], axis_id)].attrs.items()])
+                    for axis_id in [0, 1]]
+        sample_duration_s = time_axis['INCREMENT']
+        if interval_samples is None:
+            samples_per_interval = int(numpy.floor(interval_s/sample_duration_s))
+        else:
+            samples_per_interval = interval_samples
+        timeslots_per_file = h5_files_by_sap[0][0][sap_fmt % (0, 0)].shape[0]
+        first_timeslot = 0
+
+        # Pre-find groups to save on h5py Group getitem calls, which previously
+        # cost 20--25% of total runtime
+        h5_groups = [[h5_file[sap_fmt % (sap_id, pol)]
+                      for pol, h5_file in enumerate(h5_files_by_sap[sap_id])]
+                     for sap_ix, sap_id in enumerate(sap_ids)]
+        num_sb = len(freq_axis['AXIS_VALUES_WORLD'])
+        num_timeslots = (timeslots_per_file-num_samples) // samples_per_interval
+        time_series_real = numpy.zeros((len(sap_ids), 4, num_samples, num_sb), dtype=numpy.float32)
+        timeslot = 0
+        while first_timeslot < timeslots_per_file - samples_per_interval - num_samples:
+            time_axis['REFERENCE_VALUE'] = (first_timeslot+num_samples/2)*sample_duration_s
+            [[h5_groups[sap_id][pol].read_direct(time_series_real,
+                                                  numpy.s_[first_timeslot:first_timeslot+num_samples,:],
+                                                 numpy.s_[sap_ix, pol, :, :])
+                                      for pol in range(4)]
+                                      for sap_ix, sap_id in enumerate(sap_ids)]
+            time_series_complex_x = time_series_real[:,0,:,:] + 1j*time_series_real[:,1,:,:]
+            time_series_complex_y = time_series_real[:,2,:,:] + 1j*time_series_real[:,3,:,:]
+            first_timeslot += samples_per_interval
+            timeslot += 1
+            yield (time_series_complex_x, time_series_complex_y, time_axis, freq_axis)
+
+
+
+def read_timeseries(dir_name, sas_id_string, sap_id):
+    names = [('%s_SAP%03d_B000_S%d_P000_bf.h5' % (sas_id_string, sap_id, pol))
+             for pol in [0, 1, 2, 3]]
+    sap_fmt = 'SUB_ARRAY_POINTING_%03d/BEAM_000/STOKES_%d'
+    coordinate_fmt = 'SUB_ARRAY_POINTING_%03d/BEAM_000/COORDINATES/COORDINATE_%d'
+    with working_dir(dir_name):
+        h5_files = [h5py.File(file_name) for file_name in names]
+        time_series = numpy.array([h5_file[sap_fmt % (sap_id, pol)][:,:]
+                                   for pol, h5_file in enumerate(h5_files)],
+                                  dtype=numpy.float32)
+        time_axis, freq_axis = [
+            dict([i for i in h5_files[0][coordinate_fmt % (sap_id, axis_id)].attrs.items()])
+            for axis_id in [0, 1]]
+    return (time_series[0,:,:] + 1j*time_series[1,:,:],
+            time_series[2,:,:] + 1j*time_series[3,:,:],
+            time_axis, freq_axis)
+
+
+
 class MedianFilter(object):
     def __init__(self, window_width):
         self.window_width = window_width
