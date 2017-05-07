@@ -48,11 +48,19 @@ def data_loss_report_plot(dir_name):
                                    for file_name in sorted(file_names[pol])]))
     losses = numpy.array(losses).T
     max_losses = losses.sum(axis=1)
+    min_losses = losses.max(axis=1)
     indices = numpy.arange(len(max_losses))
-    color_code = ['green', 'orange', 'red']+['red']*80
-    plt.barh(indices, max_losses*100, height=0.9, color=[color_code[int(loss/0.05)] for loss in max_losses])
+    color_code = ['blue', 'green', 'red']+['red']*80
+    plt.barh(indices, max_losses*100, height=0.9,
+             color=[color_code[int(loss/0.05)] for loss in max_losses],
+             alpha=0.3)
+    plt.barh(indices, min_losses*100, height=0.9,
+             color=[color_code[int(loss/0.05)] for loss in min_losses],
+             alpha=1)
     plt.xlim(0, 100)
+    plt.ylim(-0.5, len(min_losses)-0.5)
     plt.yticks(indices, [name.split('_')[1][3:] for name in file_names['x_re']])
     plt.xlabel('Percentage lost')
     plt.ylabel('Antenna')
     plt.title('Data loss %s: %.1f%% total' % (file_names['x_re'][0].split('_')[0], max_losses.mean()*100))
+    plt.grid(axis='x')
