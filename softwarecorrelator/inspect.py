@@ -13,11 +13,14 @@ def data_loss_fraction(dir_name, hdf5_name,
                        detection_threshold=0.01, fractional_error_at_threshold=0.1):
     with working_dir(dir_name):
         h5 = h5py.File(hdf5_name)
-        h5_data_path = [n for n in h5_structure(h5) if 'STOKES' in n][0]
-        num_samples = int(1/(detection_threshold*fractional_error_at_threshold**2))
-        sub_sampling = int(numpy.product(h5[h5_data_path].shape)//num_samples)
-        subset = h5[h5_data_path][::sub_sampling,:]
-        return numpy.sum(subset == 0.0)/numpy.product(subset.shape)    
+        try:
+            h5_data_path = [n for n in h5_structure(h5) if 'STOKES' in n][0]
+            num_samples = int(1/(detection_threshold*fractional_error_at_threshold**2))
+            sub_sampling = int(numpy.product(h5[h5_data_path].shape)//num_samples)
+            subset = h5[h5_data_path][::sub_sampling,:]
+            return numpy.sum(subset == 0.0)/numpy.product(subset.shape)
+        except:
+            return 1.0
 
 
 def data_loss_report_ascii(dir_name):
