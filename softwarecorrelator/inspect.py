@@ -90,6 +90,26 @@ def subsampled_dynamic_spectra_by_timeslot(dir_name, sas_id=None,
 
     **Parameters**
 
+    dir_name : string
+        Directory containing the HDF5 files.
+
+    sas_id : None or string
+        If None, it is assumed that there is only one SAS ID present
+        in the directory. Otherwise, specify the full SAS ID,
+        including leading 'L'.
+
+    sap_ids : sequence of int
+        The SAP ids that must be read. Default: range(48).
+
+    num_chan : int
+        Number of channels in the output. Default: 256.
+    
+    num_taps : int
+        Number of PPF taps. Default: 16.
+
+    interval_s : float
+        Number of seconds between output spectra. Default: 0.1.
+
 
     **Returns**
 
