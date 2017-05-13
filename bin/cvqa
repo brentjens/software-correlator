@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import argparse
-import sys
+import sys, os
 import logging
 
 from softwarecorrelator import __version__
@@ -19,10 +19,14 @@ if __name__ == '__main__':
 
     parser.add_argument('-v', '--version', action='version',
                         version='%(prog)s '+__version__+' (c) 2017 M.A. Brentjens <brentjens@astron.nl>')
+
+    parser.add_argument('-o', '--output-dir', metavar='DIRECTORY', type=str,
+                        help='Directory in which to write the PDF report. Default: current directory.')
+
     parser.add_argument('-l', '--logging', metavar='LOGLEVEL', type=str,
                         choices=['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG'],
                         default='INFO',
-                        help='Set minimum log intensity level. Choose one of "CRITICAL", "ERROR", "WARNING", "INFO", or "DEBUG"')
+                        help='Minimum log intensity level. Choose one of "CRITICAL", "ERROR", "WARNING", "INFO", or "DEBUG"')
     args = parser.parse_args()
 
 
@@ -52,9 +56,9 @@ if __name__ == '__main__':
     # Report generation
     #
     data_loss_report_ascii(args.directory[0])
-
+    output_template=os.path.join(args.output_dir,'%(sas_id)s-%(antenna_set)s-%(obs_datetime)s.pdf')
     output_filename = write_inspection_pdf(
         input_dir_name=args.directory[0],
-        output_filename_template='%(sas_id)s-%(antenna_set)s-%(obs_datetime)s.pdf')
+        output_filename_template=output_template)
     logging.info('Report written to %s', output_filename)
     
