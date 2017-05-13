@@ -4,7 +4,7 @@ import sys
 import logging
 
 from softwarecorrelator import __version__
-from softwarecorrelator.inspect import data_loss_report_ascii
+from softwarecorrelator.inspect import data_loss_report_ascii, write_inspection_pdf
 
 
 if __name__ == '__main__':
@@ -53,6 +53,8 @@ if __name__ == '__main__':
     #
     data_loss_report_ascii(args.directory[0])
 
-    write_inspection_pdf(input_dirname=args.directory[0],
-                         output_filename_template='%(sas_id)s-%(antenna_set)s-%(obs_datetime)s.pdf')
+    output_filename = write_inspection_pdf(
+        input_dir_name=args.directory[0],
+        output_filename_template='%(sas_id)s-%(antenna_set)s-%(obs_datetime)s.pdf')
+    logging.info('Report written to %s', output_filename)
     

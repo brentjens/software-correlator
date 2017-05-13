@@ -30,8 +30,8 @@ def h5_complex_voltage_file_names(dir_name):
                 'x_im': sorted([n for n in hdf5_file_names if '_S1_' in n]),
                 'y_re': sorted([n for n in hdf5_file_names if '_S2_' in n]),
                 'y_im': sorted([n for n in hdf5_file_names if '_S3_' in n])}
-
-
+    
+    
 def h5_first_beam(h5file):
     def collect(x):
         if 'STOKES_0' in x:
@@ -75,7 +75,10 @@ def h5_structure(h5file):
     h5file.visit(accumulate_fields)
     return fields
 
-    
+
+def h5_obs_header(h5file):
+    return dict(h5file.attrs)
+
 def h5_beam_header(h5file):
     return dict(h5file[h5_first_beam(h5file).split('STOKES')[0]].attrs)
 
@@ -140,12 +143,12 @@ def read_timeseries_subsampled_by_sap(dir_name, sas_id_string, sap_ids, interval
 
 def read_timeseries_subsampled(dir_name, sas_id_string, sap_ids, interval_s=0.1,
                                interval_samples=None, num_samples=256*16):
-    sap_names = [[('%s_SAP%03d_B000_S%d_P000_bf.h5' % (sas_id_string, sap_id, pol))
-                  for pol in [0, 1, 2, 3]]
-                 for sap_id in sap_ids]
     sap_fmt = 'SUB_ARRAY_POINTING_%03d/BEAM_000/STOKES_%d'
     coordinate_fmt = 'SUB_ARRAY_POINTING_%03d/BEAM_000/COORDINATES/COORDINATE_%d'
     with working_dir(dir_name):
+        sap_names = [[('%s_SAP%03d_B000_S%d_P000_bf.h5' % (sas_id_string, sap_id, pol))
+                      for pol in [0, 1, 2, 3]]
+                     for sap_id in sap_ids]
         h5_files_by_sap = [[h5py.File(file_name) for file_name in names]
                            for names in sap_names]
         time_axis, freq_axis = [

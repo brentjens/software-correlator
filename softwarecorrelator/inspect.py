@@ -2,11 +2,12 @@ import numpy
 import h5py
 import logging
 import glob
+import os
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
 from .utilities import working_dir
-from .lofarhdf5 import h5_structure, h5_complex_voltage_file_names
+from .lofarhdf5 import h5_structure, h5_complex_voltage_file_names, h5_obs_header
 from .lofarhdf5 import read_timeseries_subsampled
 from .stationprocessing import fir_filter_coefficients, channelize_ppf
 
@@ -164,23 +165,80 @@ def subsampled_dynamic_spectra_by_timeslot(dir_name, sas_id=None,
     xx = numpy.array(xx, dtype=numpy.complex64).transpose(1,2,0,3).copy(order='C')
     yy = numpy.array(yy, dtype=numpy.complex64).transpose(1,2,0,3).copy(order='C')
     time_s = numpy.array(time_s)
-    return xx, yy, time_s, freq_axis
+    return xx, yy, time_s, freq_axis, sas_id
+
+
+def dynamic_spectrum_plot(dynamic_spectra_sb_time_chan, time_s, sb_freq_hz, num_taps=16, caption=''):
+    num_sb, num_timeslots, num_chan = dynamic_spectra_sb_time_chan.shape
+    ds = dynamic_spectra_sb_time_chan
+    interval_s = time_s[1] - time_s[0]
+    plt.figtext(0.5, 0.93, caption, horizontalalignment='center', fontsize=16)
+    median_spectrum = numpy.median(ds[:,:,2*num_chan//num_taps:-2*num_chan//num_taps].mean(axis=1))
+    for sb, freq_hz in enumerate(sb_freq_hz):
+        ax_spectra = plt.subplot2grid((7, num_sb), (6, sb), colspan=1, rowspan=1)
+        plt.plot(ds[sb,:,:].mean(axis=0), lw=2)
+        if sb == 0:
+            plt.ylim(0.5*median_spectrum, 1.5*median_spectrum)
+            yticks_spectra = plt.yticks()[0]
+            plt.ylabel('Power')
+        else:
+            plt.yticks(yticks_spectra, ['']*len(yticks_spectra))
+            plt.ylim(0.5*median_spectrum, 1.5*median_spectrum)
+        xticks_spectra = plt.xticks()[0]
+        plt.xlim(-0.5, num_chan-0.5)
+        plt.xlabel('Channel')
+        
+        ax_dynspec = plt.subplot2grid((7, num_sb), (0, sb), colspan=1, rowspan=6)
+        plt.title('%.3f MHz' % (sb_freq_hz[sb]/1e6,))
+        plt.imshow(ds[sb,:,:], vmin=0, vmax=1.5*median_spectrum,
+           extent=(-0.5, num_chan-0.5, time_s[-1]+interval_s/2, -interval_s/2))
+        plt.axis('tight')
+        if sb == 0:
+            plt.ylim(time_s[-1]+interval_s/2, -interval_s/2)
+            yticks_dynspec = plt.yticks()[0]
+            plt.ylabel('Time [s]')
+        else:
+            plt.yticks(yticks_dynspec, ['']*len(yticks_dynspec))
+            plt.ylim(time_s[-1]+interval_s/2, -interval_s/2)
+        plt.xticks(xticks_spectra, ['']*len(xticks_spectra))
+        plt.xlim(-0.5, num_chan-0.5)
+    plt.subplots_adjust(wspace=0.0)
+
+
+def complex_voltage_obs_header(dir_name, sas_id=None):
+    sas_id = find_sas_id(dir_name, sas_id)
+    with working_dir(dir_name):
+        sap_ids = range(488)
+        sap_names = [[('%s_SAP%03d_B000_S%d_P000_bf.h5' % (sas_id, sap_id, pol))
+                      for pol in [0, 1, 2, 3]]
+                     for sap_id in sap_ids]
+        first_h5_file = [h5py.File(file_names[0])
+                         for file_names in sap_names
+                         if os.path.exists(file_names[0])][0]
+        return h5_obs_header(first_h5_file)
 
 
 
 
-
-def write_inspection_pdf(input_dirname, output_filename_template, sas_id=None):
+def write_inspection_pdf(input_dir_name, output_filename_template, sas_id=None):
     r'''
     example template: '%(sas_id)s-%(antenna_set)s-%(obs_datetime)s.pdf'
     '''
-    xx, yy, time_s, freq_axis = subsampled_dynamic_spectra_by_timeslot(
-        input_dir_name, sas_id=sas_id)
+    xx, yy, time_s, freq_axis, sas_id = subsampled_dynamic_spectra_by_timeslot(
+                                                 input_dir_name, sas_id=sas_id)
+    obs_header = complex_voltage_obs_header(input_dir_name, sas_id)
+    info_dict = {}
+    info_dict['sas_id'] = sas_id
+    info_dict['antenna_set'] = obs_header['ANTENNA_SET'].decode('utf8')
+    obs_datetime_compact = ''.join([ch for ch in obs_header['OBSERVATION_START_UTC'].decode('utf8')[0:19]
+                                    if ch not in '-:T'])
+    info_dict['obs_datetime'] = '%s_%s' % (obs_datetime_compact[0:8], obs_datetime_compact[8:], )
 
+    output_filename = output_filename_template % info_dict
     with PdfPages(output_filename) as pdf:
         # DATA LOSS
         plt.figure(figsize=(7,11))
-        data_loss_report_plot(input_dirname)
+        data_loss_report_plot(input_dir_name)
         pdf.savefig(papertype='a4', orientation='portrait')
         plt.close()
 
@@ -194,7 +252,7 @@ def write_inspection_pdf(input_dirname, output_filename_template, sas_id=None):
 
         # MEDIAN SPECTRUM
         plt.figure(figsize=(11,7), dpi=300)
-        mean_dynspec = median(abs(xx)**2, axis=0) + median(abs(yy)**2, axis=0)
+        mean_dynspec = numpy.median(abs(xx)**2, axis=0) + numpy.median(abs(yy)**2, axis=0)
         dynamic_spectrum_plot(mean_dynspec,time_s,freq_axis['AXIS_VALUES_WORLD'],
                               caption='Incoherent median of antennas')
         pdf.savefig(papertype='a4', orientation='landscape')
@@ -208,3 +266,4 @@ def write_inspection_pdf(input_dirname, output_filename_template, sas_id=None):
                                   caption='Antenna %d' % antenna)
             pdf.savefig(papertype='a4', orientation='landscape')
             plt.close()
+        return output_filename
