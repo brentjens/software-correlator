@@ -1,0 +1,3 @@
+include *.sh
+recursive-include docker Dockerfile bashrc *.sh
+recursive-include docker/bashrc.d *

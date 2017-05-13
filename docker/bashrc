@@ -1,0 +1,7 @@
+#!/bin/bash
+
+# Read all profiles
+shopt -s nullglob
+for rc in ${INSTALLDIR}/bashrc.d/*; do
+  source $rc
+done
