@@ -1,1 +1,7 @@
 *~
+MANIFEST
+cvqa.img
+dist/
+softwarecorrelator/__pycache__/
+.coverage
+coverage/
