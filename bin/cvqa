@@ -52,5 +52,7 @@ if __name__ == '__main__':
     # Report generation
     #
     data_loss_report_ascii(args.directory[0])
-    
+
+    write_inspection_pdf(input_dirname=args.directory[0],
+                         output_filename_template='%(sas_id)s-%(antenna_set)s-%(obs_datetime)s.pdf')
     

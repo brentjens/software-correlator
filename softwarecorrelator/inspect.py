@@ -3,6 +3,7 @@ import h5py
 import logging
 import glob
 import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
 
 from .utilities import working_dir
 from .lofarhdf5 import h5_structure, h5_complex_voltage_file_names
@@ -75,6 +76,21 @@ def data_loss_report_plot(dir_name):
 
 
 
+def find_sas_id(dir_name, sas_id=None):
+    if sas_id is None:
+        with working_dir(dir_name):
+            names = glob.glob('*.h5')
+        unique_names = numpy.unique([name[:8] for name in names])
+        if len(unique_names) == 1 and unique_names[0][0] == 'L':
+            try:
+                sas_nr = int(unique_names[0].lstrip('L').rstrip('_'))
+            except:
+                logging.warning('%s might not be valid SAS ID.', unique_names[0].rstrip('_'))
+            sas_id = unique_names[0].rstrip('_')
+    if sas_id is None:
+        raise ValueError('Unable to find SAS ID.')
+    return sas_id
+
 
 
 
@@ -121,18 +137,7 @@ def subsampled_dynamic_spectra_by_timeslot(dir_name, sas_id=None,
     freq_axis['AXIS_VALUES_WORLD'].
     '''
     fir_coef = fir_filter_coefficients(num_chan, num_taps)
-    if sas_id is None:
-        with working_dir(dir_name):
-            names = glob.glob('*.h5')
-        unique_names = numpy.unique([name[:8] for name in names])
-        if len(unique_names) == 1 and unique_names[0][0] == 'L':
-            try:
-                sas_nr = int(unique_names[0].lstrip('L').rstrip('_'))
-            except:
-                logging.warning('%s might not be valid SAS ID.', unique_names[0].rstrip('_'))
-            sas_id = unique_names[0].rstrip('_')
-    if sas_id is None:
-        raise ValueError('Unable to find SAS ID.')
+    sas_id = find_sas_id(dir_name, sas_id)
     time_s = []
     xx = []
     yy = []
@@ -160,3 +165,46 @@ def subsampled_dynamic_spectra_by_timeslot(dir_name, sas_id=None,
     yy = numpy.array(yy, dtype=numpy.complex64).transpose(1,2,0,3).copy(order='C')
     time_s = numpy.array(time_s)
     return xx, yy, time_s, freq_axis
+
+
+
+
+
+def write_inspection_pdf(input_dirname, output_filename_template, sas_id=None):
+    r'''
+    example template: '%(sas_id)s-%(antenna_set)s-%(obs_datetime)s.pdf'
+    '''
+    xx, yy, time_s, freq_axis = subsampled_dynamic_spectra_by_timeslot(
+        input_dir_name, sas_id=sas_id)
+
+    with PdfPages(output_filename) as pdf:
+        # DATA LOSS
+        plt.figure(figsize=(7,11))
+        data_loss_report_plot(input_dirname)
+        pdf.savefig(papertype='a4', orientation='portrait')
+        plt.close()
+
+        # MEAN SPECTRUM
+        plt.figure(figsize=(11,7), dpi=300)
+        mean_dynspec = (abs(xx)**2).mean(axis=0) + (abs(yy)**2).mean(axis=0)
+        dynamic_spectrum_plot(mean_dynspec,time_s,freq_axis['AXIS_VALUES_WORLD'],
+                              caption='Incoherent mean of antennas')
+        pdf.savefig(papertype='a4', orientation='landscape')
+        plt.close()
+
+        # MEDIAN SPECTRUM
+        plt.figure(figsize=(11,7), dpi=300)
+        mean_dynspec = median(abs(xx)**2, axis=0) + median(abs(yy)**2, axis=0)
+        dynamic_spectrum_plot(mean_dynspec,time_s,freq_axis['AXIS_VALUES_WORLD'],
+                              caption='Incoherent median of antennas')
+        pdf.savefig(papertype='a4', orientation='landscape')
+        plt.close()
+
+        # ANTENNA SPECTRA
+        for antenna in range(xx.shape[0]):
+            plt.figure(figsize=(11,7), dpi=300)
+            antenna_dynspec = (abs(xx[antenna,:,:,:])**2) + (abs(yy[antenna,:,:])**2)
+            dynamic_spectrum_plot(antenna_dynspec,time_s,freq_axis['AXIS_VALUES_WORLD'],
+                                  caption='Antenna %d' % antenna)
+            pdf.savefig(papertype='a4', orientation='landscape')
+            plt.close()
