@@ -88,3 +88,46 @@ def channelize_ppf_multi_ts(timeseries_taps, fir_coefficients):
     '''FIR coefficients are num_taps x num_chan, blocks are num_timeslots x num_taps x num_chan arrays'''
     return (fft.ifft((timeseries_taps*fir_coefficients[numpy.newaxis,:,:]).sum(axis=1),
                       axis=1))
+
+
+
+def samples_per_block(block_length_s, sample_duration_s, num_chan, num_taps):
+    r'''
+    Calculate the number of samples per correlator intergration time,
+    as well as the number of samples that must be read. The latter is
+    larger because a certain number of samples before and after the
+    actual interval must be read to properly fill the PPF.
+
+    **Parameters**
+
+    block_length_s : float
+        Number of seconds per correlator interval.
+
+    sample_duration_s : float
+        Number of seconds per sample in the time series data.
+
+    num_chan : int
+        Number of channels for the PPF.
+
+    num_taps : int
+        Number of taps in the PPF
+
+
+    **Returns**
+
+    Tuple (block_length samples, samples_to_read_per_block). Both
+    integers.
+
+    **Examples**
+
+    >>> block_length_samples, samples_to_read = samples_per_block(0.1, 1024/200e6, num_chan=256, num_taps=16)
+    >>> block_length_samples, block_length_samples/256, samples_to_read/256
+    (19456, 76.0, 91.0)
+    >>> print(block_length_samples*1024/200e6, ' seconds')
+    0.09961472  seconds
+
+    '''
+    num_spectra = int(round(block_length_s/sample_duration_s/num_chan))
+    block_length_samples = num_spectra*num_chan 
+    samples_to_read_per_block = (num_spectra+(num_taps-1))*num_chan
+    return block_length_samples, samples_to_read_per_block
