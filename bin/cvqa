@@ -55,8 +55,10 @@ if __name__ == '__main__':
     #
     # Report generation
     #
+    logging.info('Generating data loss report')
     data_loss_report_ascii(args.directory[0])
     output_template=os.path.join(args.output_dir,'%(sas_id)s-%(antenna_set)s-%(obs_datetime)s.pdf')
+    logging.info('Creating inspection PDF')
     output_filename = write_inspection_pdf(
         input_dir_name=args.directory[0],
         output_filename_template=output_template)

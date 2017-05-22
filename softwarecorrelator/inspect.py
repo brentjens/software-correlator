@@ -224,8 +224,9 @@ def write_inspection_pdf(input_dir_name, output_filename_template, sas_id=None):
     r'''
     example template: '%(sas_id)s-%(antenna_set)s-%(obs_datetime)s.pdf'
     '''
-    xx, yy, time_s, freq_axis, sas_id = subsampled_dynamic_spectra_by_timeslot(
-                                                 input_dir_name, sas_id=sas_id)
+    logging.info('write_inspection_pdf(%r, %r, %r)',
+                 input_dir_name, output_filename_template, sas_id)
+
     obs_header = complex_voltage_obs_header(input_dir_name, sas_id)
     info_dict = {}
     info_dict['sas_id'] = sas_id
@@ -234,7 +235,12 @@ def write_inspection_pdf(input_dir_name, output_filename_template, sas_id=None):
                                     if ch not in '-:T'])
     info_dict['obs_datetime'] = '%s_%s' % (obs_datetime_compact[0:8], obs_datetime_compact[8:], )
 
+    logging.info('%r', info_dict)
+    logging.info('Reading data')
+    xx, yy, time_s, freq_axis, sas_id = subsampled_dynamic_spectra_by_timeslot(
+                                                 input_dir_name, sas_id=sas_id)
     output_filename = output_filename_template % info_dict
+    logging.info('Generating plots in file %s', output_filename)
     with PdfPages(output_filename) as pdf:
         # DATA LOSS
         plt.figure(figsize=(7,11))
