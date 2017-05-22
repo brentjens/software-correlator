@@ -161,7 +161,7 @@ def subsampled_dynamic_spectra_by_timeslot(dir_name, sas_id=None,
 
         if time_s[-1] > next_report_s:
             next_report_s += report_interval_s
-            print(time_s[-1])
+            logging.info(repr(time_s[-1]))
     xx = numpy.array(xx, dtype=numpy.complex64).transpose(1,2,0,3).copy(order='C')
     yy = numpy.array(yy, dtype=numpy.complex64).transpose(1,2,0,3).copy(order='C')
     time_s = numpy.array(time_s)
