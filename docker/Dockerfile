@@ -71,5 +71,6 @@ RUN mkdir -p ${INSTALLDIR}
 COPY ["bashrc",    "${INSTALLDIR}/"]
 COPY ["bashrc.d",  "${INSTALLDIR}/bashrc.d/"]
 COPY ["chuser.sh", "/usr/local/bin"]
+WORKDIR "/"
 ENTRYPOINT ["/usr/local/bin/chuser.sh"]
 
