@@ -16,6 +16,7 @@ from .stationprocessing import fir_filter_coefficients, channelize_ppf
 
 def data_loss_fraction(dir_name, hdf5_name,
                        detection_threshold=0.01, fractional_error_at_threshold=0.1):
+    logging.info('data_loss_fraction(%r, %r)', dir_name, hdf5_name)
     with working_dir(dir_name):
         h5 = h5py.File(hdf5_name)
         try:
@@ -36,14 +37,14 @@ def data_loss_report_ascii(dir_name):
                                    for file_name in sorted(file_names[pol])]))
     losses = (numpy.array(losses).T).tolist()
     logging.debug(losses)
-    print('============================================================================')
-    print('                            DATA LOSS [%]')
-    print('============================================================================')
-    print('NAME                                 X_RE     X_IM     Y_RE     Y_IM     MAX')
-    print('----------------------------------------------------------------------------')
+    logging.info('============================================================================')
+    logging.info('                            DATA LOSS [%]')
+    logging.info('============================================================================')
+    logging.info('NAME                                 X_RE     X_IM     Y_RE     Y_IM     MAX')
+    logging.info('----------------------------------------------------------------------------')
     for row in zip(file_names['x_re'], losses):
-        print(row[0], '  %5.1f    %5.1f    %5.1f    %5.1f   %5.1f' % (tuple(numpy.array(row[1])*100) + (numpy.array(row[1]).max()*100,)))
-    print('============================================================================')
+        logging.info(row[0], '  %5.1f    %5.1f    %5.1f    %5.1f   %5.1f' % (tuple(numpy.array(row[1])*100) + (numpy.array(row[1]).max()*100,)))
+    logging.info('============================================================================')
 
 
 
