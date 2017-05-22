@@ -21,6 +21,7 @@ if __name__ == '__main__':
                         version='%(prog)s '+__version__+' (c) 2017 M.A. Brentjens <brentjens@astron.nl>')
 
     parser.add_argument('-o', '--output-dir', metavar='DIRECTORY', type=str,
+                        default='.',
                         help='Directory in which to write the PDF report. Default: current directory.')
 
     parser.add_argument('-l', '--logging', metavar='LOGLEVEL', type=str,
@@ -57,7 +58,7 @@ if __name__ == '__main__':
     #
     logging.info('Generating data loss report')
     data_loss_report_ascii(args.directory[0])
-    output_template=os.path.join(args.output_dir,'%(sas_id)s-%(antenna_set)s-%(obs_datetime)s.pdf')
+    output_template = os.path.join(args.output_dir,'%(sas_id)s-%(antenna_set)s-%(obs_datetime)s.pdf')
     logging.info('Creating inspection PDF')
     output_filename = write_inspection_pdf(
         input_dir_name=args.directory[0],
