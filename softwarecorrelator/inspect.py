@@ -57,8 +57,10 @@ def data_loss_report_plot(dir_name):
     file_names = h5_complex_voltage_file_names(dir_name)
     losses = []
     for pol in ['x_re', 'x_im', 'y_re', 'y_im']:
-        losses.append(numpy.array([data_loss_fraction(dir_name, file_name)
-                                   for file_name in sorted(file_names[pol])]))
+        with mp.Pool(processes=len(file_names[pol])) as pool:
+            processes = [pool.apply_async(data_loss_fraction, (file_name, dir_name))
+                         for file_name in sorted(file_names[pol])]
+            losses.append(numpy.array([process.get() for process in processes]))
     losses = numpy.array(losses).T
     max_losses = losses.sum(axis=1)
     min_losses = losses.max(axis=1)
