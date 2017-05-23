@@ -235,6 +235,10 @@ def write_inspection_pdf(input_dir_name, output_filename_template, sas_id=None, 
                  input_dir_name, output_filename_template, sas_id)
 
     obs_header = complex_voltage_obs_header(input_dir_name, sas_id)
+    logging.info('Reading data')
+    xx, yy, time_s, freq_axis, sas_id = subsampled_dynamic_spectra_by_timeslot(
+        input_dir_name, sas_id=sas_id,
+        interval_s=interval_s)
     info_dict = {}
     info_dict['sas_id'] = sas_id
     info_dict['antenna_set'] = obs_header['ANTENNA_SET'].decode('utf8')
@@ -243,10 +247,6 @@ def write_inspection_pdf(input_dir_name, output_filename_template, sas_id=None, 
     info_dict['obs_datetime'] = '%s_%s' % (obs_datetime_compact[0:8], obs_datetime_compact[8:], )
 
     logging.info('%r', info_dict)
-    logging.info('Reading data')
-    xx, yy, time_s, freq_axis, sas_id = subsampled_dynamic_spectra_by_timeslot(
-        input_dir_name, sas_id=sas_id,
-        interval_s=interval_s)
     output_filename = output_filename_template % info_dict
     logging.info('Generating plots in file %s', output_filename)
     with PdfPages(output_filename) as pdf:
