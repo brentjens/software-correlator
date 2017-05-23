@@ -6,6 +6,7 @@ import sys, os, socket
 import logging
 
 from softwarecorrelator import __version__
+from softwarecorrelator.utilities import parse_subband_list
 from softwarecorrelator.inspect import data_loss_report_ascii, write_inspection_pdf
 
 
@@ -24,6 +25,10 @@ if __name__ == '__main__':
 
     parser.add_argument('-o', '--output-dir', metavar='DIRECTORY', type=str,
                         default='.',
+                        help='Directory in which to write the PDF report. Default: current directory.')
+
+    parser.add_argument('-s', '--sap-ids', metavar='DIRECTORY', type=str,
+                        default='0..47',
                         help='Directory in which to write the PDF report. Default: current directory.')
 
     parser.add_argument('-l', '--logging', metavar='LOGLEVEL', type=str,
@@ -65,6 +70,7 @@ if __name__ == '__main__':
     output_filename = write_inspection_pdf(
         input_dir_name=args.directory[0],
         output_filename_template=output_template,
-        interval_s=1.0)
+        interval_s=1.0,
+        sap_ids=parse_subband_list(args.sap_ids))
     logging.info('Report written to %s', output_filename)
     
