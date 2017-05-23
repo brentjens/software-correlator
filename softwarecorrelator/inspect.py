@@ -17,9 +17,9 @@ from .stationprocessing import fir_filter_coefficients, channelize_ppf
 
 def data_loss_fraction(hdf5_name, dir_name,
                        detection_threshold=0.01, fractional_error_at_threshold=0.1):
-    logging.info('data_loss_fraction(%r, %r)', dir_name, hdf5_name)
+    logging.debug('data_loss_fraction(%r, %r)', dir_name, hdf5_name)
     with working_dir(dir_name):
-        h5 = h5py.File(hdf5_name)
+        h5 = h5py.File(hdf5_name, mode='r')
         try:
             h5_data_path = [n for n in h5_structure(h5) if 'STOKES' in n][0]
             num_samples = int(1/(detection_threshold*fractional_error_at_threshold**2))
@@ -219,7 +219,7 @@ def complex_voltage_obs_header(dir_name, sas_id=None):
         sap_names = [[('%s_SAP%03d_B000_S%d_P000_bf.h5' % (sas_id, sap_id, pol))
                       for pol in [0, 1, 2, 3]]
                      for sap_id in sap_ids]
-        first_h5_file = [h5py.File(file_names[0])
+        first_h5_file = [h5py.File(file_names[0], mode='r')
                          for file_names in sap_names
                          if os.path.exists(file_names[0])][0]
         return h5_obs_header(first_h5_file)

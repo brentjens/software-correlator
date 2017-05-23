@@ -99,7 +99,7 @@ def read_timeseries_subsampled_by_sap(dir_name, sas_id_string, sap_ids, interval
     sap_fmt = 'SUB_ARRAY_POINTING_%03d/BEAM_000/STOKES_%d'
     coordinate_fmt = 'SUB_ARRAY_POINTING_%03d/BEAM_000/COORDINATES/COORDINATE_%d'
     with working_dir(dir_name):
-        h5_files_by_sap = [[h5py.File(file_name) for file_name in names]
+        h5_files_by_sap = [[h5py.File(file_name, mode='r') for file_name in names]
                            for names in sap_names]
         time_axis, freq_axis = [
             dict([i for i in h5_files_by_sap[0][0][coordinate_fmt % (sap_ids[0], axis_id)].attrs.items()])
@@ -149,7 +149,7 @@ def read_timeseries_subsampled(dir_name, sas_id_string, sap_ids, interval_s=0.1,
         sap_names = [[('%s_SAP%03d_B000_S%d_P000_bf.h5' % (sas_id_string, sap_id, pol))
                       for pol in [0, 1, 2, 3]]
                      for sap_id in sap_ids]
-        h5_files_by_sap = [[h5py.File(file_name) for file_name in names]
+        h5_files_by_sap = [[h5py.File(file_name, mode='r') for file_name in names]
                            for names in sap_names]
         time_axis, freq_axis = [
             dict([i for i in h5_files_by_sap[0][0][coordinate_fmt % (sap_ids[0], axis_id)].attrs.items()])
@@ -192,7 +192,7 @@ def read_timeseries(dir_name, sas_id_string, sap_id):
     sap_fmt = 'SUB_ARRAY_POINTING_%03d/BEAM_000/STOKES_%d'
     coordinate_fmt = 'SUB_ARRAY_POINTING_%03d/BEAM_000/COORDINATES/COORDINATE_%d'
     with working_dir(dir_name):
-        h5_files = [h5py.File(file_name) for file_name in names]
+        h5_files = [h5py.File(file_name, mode='r') for file_name in names]
         time_series = numpy.array([h5_file[sap_fmt % (sap_id, pol)][:,:]
                                    for pol, h5_file in enumerate(h5_files)],
                                   dtype=numpy.float32)
