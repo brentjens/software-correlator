@@ -180,24 +180,24 @@ def dynamic_spectrum_plot(dynamic_spectra_sb_time_chan, time_s, sb_freq_hz, num_
     ds = dynamic_spectra_sb_time_chan
     interval_s = time_s[1] - time_s[0]
     plt.figtext(0.5, 0.93, caption, horizontalalignment='center', fontsize=16)
-    median_spectrum = numpy.median(ds[:,:,2*num_chan//num_taps:-2*num_chan//num_taps].mean(axis=1))
+    median_spectrum = numpy.median(ds[:,:,2*num_chan//num_taps:-2*num_chan//num_taps].mean(axis=1), axis=1)
     for sb, freq_hz in enumerate(sb_freq_hz):
         ax_spectra = plt.subplot2grid((7, num_sb), (6, sb), colspan=1, rowspan=1)
         plt.plot(ds[sb,:,:].mean(axis=0), lw=2)
         if sb == 0:
-            plt.ylim(0.5*median_spectrum, 1.5*median_spectrum)
+            plt.ylim(0.5*median_spectrum[sb], 1.5*median_spectrum[sb])
             yticks_spectra = plt.yticks()[0]
             plt.ylabel('Power')
         else:
             plt.yticks(yticks_spectra, ['']*len(yticks_spectra))
-            plt.ylim(0.5*median_spectrum, 1.5*median_spectrum)
+            plt.ylim(0.5*median_spectrum[sb], 1.5*median_spectrum[sb])
         xticks_spectra = plt.xticks()[0]
         plt.xlim(-0.5, num_chan-0.5)
         plt.xlabel('Channel')
         
         ax_dynspec = plt.subplot2grid((7, num_sb), (0, sb), colspan=1, rowspan=6)
         plt.title('%.3f MHz' % (sb_freq_hz[sb]/1e6,))
-        plt.imshow(ds[sb,:,:], vmin=0, vmax=1.5*median_spectrum,
+        plt.imshow(ds[sb,:,:], vmin=0, vmax=1.5*median_spectrum[sb],
            extent=(-0.5, num_chan-0.5, time_s[-1]+interval_s/2, -interval_s/2))
         plt.axis('tight')
         if sb == 0:
