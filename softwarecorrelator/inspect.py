@@ -227,7 +227,7 @@ def complex_voltage_obs_header(dir_name, sas_id=None):
 
 
 
-def write_inspection_pdf(input_dir_name, output_filename_template, sas_id=None):
+def write_inspection_pdf(input_dir_name, output_filename_template, sas_id=None, interval_s=1):
     r'''
     example template: '%(sas_id)s-%(antenna_set)s-%(obs_datetime)s.pdf'
     '''
@@ -245,7 +245,8 @@ def write_inspection_pdf(input_dir_name, output_filename_template, sas_id=None):
     logging.info('%r', info_dict)
     logging.info('Reading data')
     xx, yy, time_s, freq_axis, sas_id = subsampled_dynamic_spectra_by_timeslot(
-                                                 input_dir_name, sas_id=sas_id)
+        input_dir_name, sas_id=sas_id,
+        interval_s=interval_s)
     output_filename = output_filename_template % info_dict
     logging.info('Generating plots in file %s', output_filename)
     with PdfPages(output_filename) as pdf:
