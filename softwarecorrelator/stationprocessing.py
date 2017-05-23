@@ -91,6 +91,18 @@ def channelize_ppf_multi_ts(timeseries_taps, fir_coefficients):
 
 
 
+def channelize_ppf_contiguous_block(timeseries_taps, fir_coefficients):
+    num_taps, num_chan = fir_coefficients.shape
+    num_ts_blocks = timeseries_taps//num_chan
+    num_spectra = num_ts_blocks -(num_taps-1)
+    output_spectra = numpy.zeros((num_spectra, num_chan),
+                                 dtype=numpy.complex64)
+    for sp in range(num_spectra):
+        output_spectra[sp,:] += channelize_ppf(time_series_taps[sp:sp+num_taps,:],
+                                               fir_coefficients)
+    return output_spectra
+
+
 def samples_per_block(block_length_s, sample_duration_s, num_chan, num_taps):
     r'''
     Calculate the number of samples per correlator intergration time,
