@@ -107,7 +107,8 @@ def subsampled_dynamic_spectra_by_timeslot(dir_name, sas_id=None,
                                            sap_ids=range(48), 
                                            num_chan=256,
                                            num_taps=16,
-                                           interval_s=0.1):
+                                           interval_s=0.1,
+                                           max_duration_s=100000.0):
     '''
     Return subsampled complex valued dynamic spectra for all antennas
     and subbands in directory `dir_name`.
@@ -134,6 +135,10 @@ def subsampled_dynamic_spectra_by_timeslot(dir_name, sas_id=None,
     interval_s : float
         Number of seconds between output spectra. Default: 0.1.
 
+    max_duration_s : float
+        Number of seconds since beginning of observation to
+        read. Default: 100000.0.
+
 
     **Returns**
 
@@ -156,6 +161,8 @@ def subsampled_dynamic_spectra_by_timeslot(dir_name, sas_id=None,
             sap_ids,
             interval_s=interval_s,
             num_samples=num_taps*num_chan)):
+        if len(time_s) > 0 and time_s[-1] + interval_s > max_duration_s:
+            break
         x = x.transpose(0,2,1)
         xx.append([[channelize_ppf(x[ant, sb, :].reshape((num_taps, num_chan)), fir_coef)
                    for sb in range(x.shape[1])]
@@ -228,7 +235,7 @@ def complex_voltage_obs_header(dir_name, sas_id=None):
 
 
 def write_inspection_pdf(input_dir_name, output_filename_template, sas_id=None,
-                         interval_s=1, sap_ids=range(48)):
+                         interval_s=1, max_duration_s=100000.0, sap_ids=range(48)):
     r'''
     example template: '%(sas_id)s-%(antenna_set)s-%(obs_datetime)s.pdf'
     '''
@@ -240,7 +247,8 @@ def write_inspection_pdf(input_dir_name, output_filename_template, sas_id=None,
     xx, yy, time_s, freq_axis, sas_id = subsampled_dynamic_spectra_by_timeslot(
         input_dir_name, sas_id=sas_id,
         sap_ids=sap_ids,
-        interval_s=interval_s)
+        interval_s=interval_s,
+        max_duration_s=max_duration_s)
     info_dict = {}
     info_dict['sas_id'] = sas_id
     info_dict['antenna_set'] = obs_header['ANTENNA_SET'].decode('utf8')

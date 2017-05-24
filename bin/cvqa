@@ -27,9 +27,13 @@ if __name__ == '__main__':
                         default='.',
                         help='Directory in which to write the PDF report. Default: current directory.')
 
-    parser.add_argument('-s', '--sap-ids', metavar='DIRECTORY', type=str,
+    parser.add_argument('-d', '--max-duration', metavar='DIRECTORY', type=float,
+                        default=100000.0,
+                        help='Number of seconds to analyse from beginning of observations. Default: 100000.')
+
+    parser.add_argument('-s', '--sap-ids', metavar='LIST', type=str,
                         default='0..47',
-                        help='Directory in which to write the PDF report. Default: current directory.')
+                        help='List of SAP IDs, eg "0..5,8,9,10..47". Default: "0..47"')
 
     parser.add_argument('-l', '--logging', metavar='LOGLEVEL', type=str,
                         choices=['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG'],
@@ -71,6 +75,7 @@ if __name__ == '__main__':
         input_dir_name=args.directory[0],
         output_filename_template=output_template,
         interval_s=1.0,
+        max_duration_s=args.max_duration,
         sap_ids=parse_subband_list(args.sap_ids))
     logging.info('Report written to %s', output_filename)
     
