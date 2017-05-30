@@ -150,3 +150,142 @@ def samples_per_block(block_length_s, sample_duration_s, num_chan, num_taps):
     block_length_samples = num_spectra*num_chan 
     samples_to_read_per_block = (num_spectra+(num_taps-1))*num_chan
     return block_length_samples, samples_to_read_per_block
+
+
+
+
+
+
+def read_and_process_antenna_worker(h5_names, sap_id,
+                                    num_sb, fir_coefficients,
+                                    connection):
+    r'''
+    Read a complex time series from a sequence of four HDF5 groups
+    containing, X_re, X_im , Y_re, Y_im, respectively. Read
+    num_timeslots starting at first_timeslot. If apply_fn is not None,
+    apply it to the resulting time series per sub band and return its
+    result.
+
+    **Parameters**
+    
+    h5_names : sequence strings
+        The HDF5 file names of X_re, X_im, Y_re, and Y_im.
+
+    first_timeslot : int
+        The first timeslot to read.
+
+    num_timeslots : int
+        The number of timeslots to read.
+
+    num_sb : int
+        The number of sub bands expected in the data.
+
+    fir_coefficients : 2D numpy.array of float32
+        A `num_taps x num_chan` array containing the FIR coefficients,
+        where `fir_coefficients.ravel()` should yield the FIR filter to
+        multiply with the original (single channel) timeseries data.
+
+    **Returns**
+    
+    Tuple of x and y numpy arrays(time, sb, channel).
+
+    **Example**
+    
+    >>> None
+    None
+    '''
+    sap_fmt = 'SUB_ARRAY_POINTING_%03d/BEAM_000/STOKES_%d'
+    num_pol = len(h5_names)
+    num_taps, num_chan = fir_coefficients.shape
+
+    bandpass = lofar_station_subband_bandpass(num_chan)
+    
+#    with working_dir(dir_name):
+    h5_files = [h5py.File(file_name, mode='r') for file_name in h5_names]
+    h5_groups = [h5_file[sap_fmt % (sap_id, pol)]
+                 for pol, h5_file in enumerate(h5_files)]
+    while True:
+        message = connection.recv()
+        if message == 'done':
+            connection.close()
+            [h5_file.close() for h5_file in h5_files]
+            break
+        first_timeslot, num_timeslots = message
+        time_series_real = numpy.zeros((4, num_timeslots, num_sb), dtype=numpy.float32)
+        [h5_groups[pol].read_direct(time_series_real,
+                                    numpy.s_[first_timeslot:first_timeslot+num_timeslots,:],
+                                    numpy.s_[pol, :, :])
+         for pol in range(num_pol)]
+        time_series_complex_x = time_series_real[0,:,:] + 1j*time_series_real[1,:,:]
+        time_series_complex_y = time_series_real[2,:,:] + 1j*time_series_real[3,:,:]
+
+        result_x = numpy.array([channelize_ppf_contiguous_block(
+            time_series_complex_x[:, sb].reshape((-1, num_chan)),
+            fir_coefficients)/bandpass[numpy.newaxis,:]
+                                for sb in range(num_sb)],
+                               dtype=numpy.complex64)
+
+        result_y = numpy.array([channelize_ppf_contiguous_block(
+            time_series_complex_x[:, sb].reshape((-1, num_chan)),
+            fir_coefficients)/bandpass[numpy.newaxis,:]
+                                for sb in range(num_sb)],
+                               dtype=numpy.complex64)
+        connection.send(['x', result_x.shape, result_x.dtype])
+        connection.send_bytes(result_x.tobytes())
+        connection.send(['y', result_y.shape, result_y.dtype])
+        connection.send_bytes(result_y.tobytes())
+
+
+
+
+
+
+def read_and_process_antenna_block_mp(dir_name, sas_id_string, sap_ids,
+                                      fir_coefficients, interval_s=None,
+                                      interval_samples=None, num_samples=256*16):
+    sap_fmt = 'SUB_ARRAY_POINTING_%03d/BEAM_000/STOKES_%d'
+    coordinate_fmt = 'SUB_ARRAY_POINTING_%03d/BEAM_000/COORDINATES/COORDINATE_%d'
+    with working_dir(dir_name):
+        sap_names = [[('%s_SAP%03d_B000_S%d_P000_bf.h5' % (sas_id_string, sap_id, pol))
+                      for pol in [0, 1, 2, 3]]
+                     for sap_id in sap_ids]
+
+        first_file = h5py.File(sap_names[0][0], mode='r')
+        time_axis, freq_axis = [
+            dict([item
+                  for item in first_file[coordinate_fmt %
+                                         (sap_ids[0], axis_id)].attrs.items()])
+            for axis_id in [0, 1]]
+        timeslots_per_file = first_file[sap_fmt % (0, 0)].shape[0]
+        first_file.close()
+        num_sb = len(freq_axis['AXIS_VALUES_WORLD'])
+
+        sample_duration_s = time_axis['INCREMENT']
+        if interval_samples is None:
+            samples_per_interval = int(numpy.floor(interval_s/sample_duration_s))
+        else:
+            samples_per_interval = interval_samples
+        first_timeslot = 0
+
+        pipes = [mp.Pipe() for sap_id in sap_ids]
+        manager_ends = [pipe[0] for pipe in pipes]
+        worker_ends = [pipe[1] for pipe in pipes]
+        processes = [mp.Process(target=read_and_process_antenna_worker,
+                                args=(h5_names, sap_id, num_sb, fir_coefficients, connection))
+                     for h5_names, sap_id, connection in zip(sap_names, sap_ids, worker_ends)]
+        [process.start() for process in processes]
+        while first_timeslot < timeslots_per_file - samples_per_interval - num_samples:
+            time_axis['REFERENCE_VALUE'] = (first_timeslot + num_samples/2)*sample_duration_s
+            [pipe.send([first_timeslot, num_samples]) for pipe in manager_ends]
+            x_metadata = [pipe.recv() for pipe in manager_ends]
+            x_data     = [numpy.frombuffer(pipe.recv_bytes(), dtype=x_meta[2]).reshape(x_meta[1])
+                          for x_meta, pipe in zip(x_metadata, manager_ends)]
+            y_metadata = [pipe.recv() for pipe in manager_ends]
+            y_data     = [numpy.frombuffer(pipe.recv_bytes(), dtype=y_meta[2]).reshape(y_meta[1])
+                          for y_meta, pipe in zip(y_metadata, manager_ends)]
+            first_timeslot += samples_per_interval
+            # Return X[sap, sb, time, chan], Y[sap, sb, time, chan], time, freq
+            yield (numpy.array(x_data, dtype=numpy.complex64),
+                   numpy.array(y_data, dtype=numpy.complex64), time_axis, freq_axis)
+        [pipe.send('done') for pipe in manager_ends]
+        [process.join() for process in processes]
