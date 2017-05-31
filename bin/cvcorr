@@ -40,10 +40,10 @@ if __name__ == '__main__':
                         help='Number of channels per subband. Default: 128')
     
     
-#    parser.add_argument('-s', '--sap-ids', metavar='LIST', type=str,
-#                        default='0..47',
-#                        help='List of SAP IDs, eg "0..5,8,9,10..47". Default: "0..47"')
-#
+    parser.add_argument('-s', '--sap-ids', metavar='LIST', type=str,
+                        default='0..47',
+                        help='List of SAP IDs, eg "0..5,8,9,10..47". Default: "0..47"')
+
 
     parser.add_argument('-l', '--logging', metavar='LOGLEVEL', type=str,
                         choices=['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG'],
@@ -81,6 +81,7 @@ if __name__ == '__main__':
         output_filename_template=output_template,
         integration_s=args.integration_time,
         max_duration_s=args.max_duration,
-        num_chan=args.channels_per_subband)#,  sap_ids=parse_subband_list(args.sap_ids))
+        num_chan=args.channels_per_subband,
+        sap_ids=parse_subband_list(args.sap_ids))
     logging.info('Report written to %r', output_filenames)
     
