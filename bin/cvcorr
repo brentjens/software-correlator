@@ -4,13 +4,24 @@ matplotlib.use('Agg')
 import argparse
 import sys, os, socket
 import logging
+import multiprocessing as mp
 
 from softwarecorrelator import __version__
 from softwarecorrelator.utilities import parse_subband_list
 from softwarecorrelator.correlator import cross_correlate
 
-if __name__ == '__main__':
 
+def kill_children(exctype, value, traceback):
+    global ORIGINAL_EXCEPTHOOK
+    for process in mp.active_children():
+        process.terminate()
+    ORIGINAL_EXCEPTHOOK(exctype, value, traceback)
+
+
+if __name__ == '__main__':
+    ORIGINAL_EXCEPTHOOK = sys.excepthook
+    sys.excepthook = kill_children
+    
     #
     # Commandline parsing
     #
@@ -23,7 +34,7 @@ if __name__ == '__main__':
                         version='%(prog)s '+__version__+' (c) 2017 M.A. Brentjens <brentjens@astron.nl>')
 
     parser.add_argument('-o', '--output-dir', metavar='DIRECTORY', type=str,
-                        default='.',
+                        default=os.getcwd(),
                         help='Directory in which to write the output files. Default: current directory.')
 
     parser.add_argument('-d', '--max-duration', metavar='SECONDS', type=float,
