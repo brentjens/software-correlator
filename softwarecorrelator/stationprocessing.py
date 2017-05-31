@@ -237,6 +237,18 @@ def read_and_process_antenna_worker(h5_names, sap_id,
 
 
 
+def time_and_freq_axes(h5_filename, sap_id=0):
+    r'''
+    '''
+    coordinate_fmt = 'SUB_ARRAY_POINTING_%03d/BEAM_000/COORDINATES/COORDINATE_%d'
+    h5_file = h5py.File(h5_filename, mode='r')
+    time_axis, freq_axis = [
+        dict([item
+              for item in h5_file[coordinate_fmt %
+                                     (sap_id, axis_id)].attrs.items()])
+        for axis_id in [0, 1]]
+    h5_file.close()
+    return time_axis, freq_axis
 
 
 
@@ -245,20 +257,15 @@ def read_and_process_antenna_block_mp(dir_name, sas_id_string, sap_ids,
                                       interval_samples=None, num_samples=256*16,
                                       max_duration_s=None):
     sap_fmt = 'SUB_ARRAY_POINTING_%03d/BEAM_000/STOKES_%d'
-    coordinate_fmt = 'SUB_ARRAY_POINTING_%03d/BEAM_000/COORDINATES/COORDINATE_%d'
     with working_dir(dir_name):
         sap_names = [[('%s_SAP%03d_B000_S%d_P000_bf.h5' % (sas_id_string, sap_id, pol))
                       for pol in [0, 1, 2, 3]]
                      for sap_id in sap_ids]
 
         first_file = h5py.File(sap_names[0][0], mode='r')
-        time_axis, freq_axis = [
-            dict([item
-                  for item in first_file[coordinate_fmt %
-                                         (sap_ids[0], axis_id)].attrs.items()])
-            for axis_id in [0, 1]]
         timeslots_per_file = first_file[sap_fmt % (0, 0)].shape[0]
         first_file.close()
+        time_axis, freq_axis = time_and_freq_axes(sap_names[0][0], sap_id=0)
         num_sb = len(freq_axis['AXIS_VALUES_WORLD'])
 
         sample_duration_s = time_axis['INCREMENT']
