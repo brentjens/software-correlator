@@ -84,5 +84,3 @@ if __name__ == '__main__':
         num_chan=args.channels_per_subband,
         sap_ids=parse_subband_list(args.sap_ids))
     logging.info('Cross correlations written to %r', output_filenames)
-    
-    
