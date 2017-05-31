@@ -123,6 +123,7 @@ def cross_correlate(input_dir_name,
                     vis[bl,:,3] = (y[antenna1, subband, :,:]*yc[antenna2, subband, :,:]).mean(axis=-1)
                     ant1.append(antenna1)
                     ant2.append(antenna2)
+                    bl += 1
             h5file['MAIN/DATA'][current_row:current_row+num_bl,:,:] = vis
             h5file['MAIN/FLAG'][current_row:current_row+num_bl,:,:] = flags
             h5file['MAIN/ANTENNA1'][current_row:current_row+num_bl] = ant1

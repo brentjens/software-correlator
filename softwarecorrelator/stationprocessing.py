@@ -226,7 +226,7 @@ def read_and_process_antenna_worker(h5_names, sap_id,
                                dtype=numpy.complex64)
 
         result_y = numpy.array([channelize_ppf_contiguous_block(
-            time_series_complex_x[:, sb].reshape((-1, num_chan)),
+            time_series_complex_y[:, sb].reshape((-1, num_chan)),
             fir_coefficients)/bandpass[numpy.newaxis,:]
                                 for sb in range(num_sb)],
                                dtype=numpy.complex64)
