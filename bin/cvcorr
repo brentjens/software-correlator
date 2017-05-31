@@ -1,0 +1,86 @@
+#!/usr/bin/env python
+import matplotlib
+matplotlib.use('Agg')
+import argparse
+import sys, os, socket
+import logging
+
+from softwarecorrelator import __version__
+from softwarecorrelator.utilities import parse_subband_list
+from softwarecorrelator.correlator import cross_correlate
+
+if __name__ == '__main__':
+
+    #
+    # Commandline parsing
+    #
+    parser = argparse.ArgumentParser(
+        description='Cross correlate LOFAR complex voltage data sets.')
+    parser.add_argument('directory', metavar='DIR', type=str, nargs=1,
+                        help='Directory containing HDF5 files and raw files for one LOFAR observation.')
+
+    parser.add_argument('-v', '--version', action='version',
+                        version='%(prog)s '+__version__+' (c) 2017 M.A. Brentjens <brentjens@astron.nl>')
+
+    parser.add_argument('-o', '--output-dir', metavar='DIRECTORY', type=str,
+                        default='.',
+                        help='Directory in which to write the output files. Default: current directory.')
+
+    parser.add_argument('-d', '--max-duration', metavar='SECONDS', type=float,
+                        default=100000.0,
+                        help='Number of seconds to correlate from beginning of observations. Default: 100000.')
+
+    parser.add_argument('-i', '--integration-time', metavar='SECONDS', type=float,
+                        default=0.1,
+                        help='Number of seconds to integrate per output visibility. Default: 0.1')
+
+
+    parser.add_argument('-c', '--channels-per-subband', metavar='NUM_CHAN', type=int,
+                        default=128,
+                        help='Number of channels per subband. Default: 128')
+    
+    
+#    parser.add_argument('-s', '--sap-ids', metavar='LIST', type=str,
+#                        default='0..47',
+#                        help='List of SAP IDs, eg "0..5,8,9,10..47". Default: "0..47"')
+#
+
+    parser.add_argument('-l', '--logging', metavar='LOGLEVEL', type=str,
+                        choices=['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG'],
+                        default='INFO',
+                        help='Minimum log intensity level. Choose one of "CRITICAL", "ERROR", "WARNING", "INFO", or "DEBUG"')
+    args = parser.parse_args()
+
+
+    #
+    # Logging setup
+    #
+    logger = logging.getLogger()
+    loglevel = {'INFO':  logging.INFO,
+                'DEBUG': logging.DEBUG,
+                'WARNING': logging.WARNING,
+                'CRITICAL': logging.CRITICAL,
+                'ERROR': logging.ERROR}[args.logging]
+    logger.setLevel(loglevel)
+    formatter = logging.Formatter('CVCORR %(asctime)s: %(levelname)s: %(message)s')
+
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(loglevel)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+
+    logging.info('New call to CVCORR on host %s', socket.gethostname())
+    logging.info(sys.argv)
+    logging.info(args)
+
+
+    output_template = os.path.join(args.output_dir,'%(sas_id)s-%(antenna_set)s-%(obs_datetime)s-SB%(subband)03d.hdf5')
+
+    output_filenames = cross_correlate(
+        input_dir_name=args.directory[0],
+        output_filename_template=output_template,
+        integration_s=args.integration_time,
+        max_duration_s=args.max_duration,
+        num_chan=args.channels_per_subband)#,  sap_ids=parse_subband_list(args.sap_ids))
+    logging.info('Report written to %r', output_filenames)
+    
