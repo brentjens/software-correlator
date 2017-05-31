@@ -46,6 +46,12 @@ RUN apt-get install -y sudo rsync ssh \
 
 
 WORKDIR "/root/"
+COPY ["lofar-antenna-positions-0.1-dev.tar.gz", "."]
+RUN  tar xvf lofar-antenna-positions-0.1-dev.tar.gz && \
+     cd lofar-antenna-positions-0.1-dev/ && \
+     python3 setup.py install && \
+     cd ../
+
 COPY ["software-correlator.tar.gz", "."]
 RUN  tar xvf software-correlator.tar.gz && \
      cd software-correlator*/ && \
