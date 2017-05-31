@@ -10,5 +10,5 @@ setup(name='software-correlator',
       author_email='brentjens@astron.nl',
       url='https://www.astron.nl/~brentjens/',
       packages=['softwarecorrelator'],
-      scripts=['bin/cvqa'],
+      scripts=['bin/cvqa', 'bin/cvcorr'],
      )
