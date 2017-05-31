@@ -51,9 +51,10 @@ def cross_correlate(input_dir_name,
             input_dir_name, sas_id, sap_ids,
             fir_coefficients=fir_filter_coefficients(num_chan=num_chan, num_taps=num_taps),
             interval_samples=samples_per_interval,
-            num_samples=samples_to_read)):
-        if len(time_s)> 0 and time_s[-1] > max_duration_s-integration_s/2:
-            break
+            num_samples=samples_to_read,
+            max_duration_s=max_duration_s)):
+        #if len(time_s)> 0 and time_s[-1] > max_duration_s-integration_s/2:
+        #    break
         #print(x.shape, y.shape)            
         xx.append([[(abs(x[ant,sb,:,:])**2).mean(axis=0)
                    for sb in range(x.shape[1])]

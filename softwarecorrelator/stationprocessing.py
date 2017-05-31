@@ -242,7 +242,8 @@ def read_and_process_antenna_worker(h5_names, sap_id,
 
 def read_and_process_antenna_block_mp(dir_name, sas_id_string, sap_ids,
                                       fir_coefficients, interval_s=None,
-                                      interval_samples=None, num_samples=256*16):
+                                      interval_samples=None, num_samples=256*16,
+                                      max_duration_s=None):
     sap_fmt = 'SUB_ARRAY_POINTING_%03d/BEAM_000/STOKES_%d'
     coordinate_fmt = 'SUB_ARRAY_POINTING_%03d/BEAM_000/COORDINATES/COORDINATE_%d'
     with working_dir(dir_name):
@@ -276,6 +277,9 @@ def read_and_process_antenna_block_mp(dir_name, sas_id_string, sap_ids,
         [process.start() for process in processes]
         while first_timeslot < timeslots_per_file - samples_per_interval - num_samples:
             time_axis['REFERENCE_VALUE'] = (first_timeslot + num_samples/2)*sample_duration_s
+            if max_duration_s is not None and (first_timeslot +num_samples)*sample_duration_s > max_duration_s:
+                break
+            
             [pipe.send([first_timeslot, num_samples]) for pipe in manager_ends]
             x_metadata = [pipe.recv() for pipe in manager_ends]
             x_data     = [numpy.frombuffer(pipe.recv_bytes(), dtype=x_meta[2]).reshape(x_meta[1])
@@ -288,4 +292,6 @@ def read_and_process_antenna_block_mp(dir_name, sas_id_string, sap_ids,
             yield (numpy.array(x_data, dtype=numpy.complex64),
                    numpy.array(y_data, dtype=numpy.complex64), time_axis, freq_axis)
         [pipe.send('done') for pipe in manager_ends]
+        [pipe.close() for pipe in manager_ends]
         [process.join() for process in processes]
+        return None
