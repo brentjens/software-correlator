@@ -36,7 +36,7 @@ def cross_correlate(input_dir_name,
                     output_filename_template,
                     sas_id_string=None,
                     integration_s=0.1, num_chan=128, num_taps=16,
-                    max_duration_s=10000,
+                    max_duration_s=None,
                     sap_ids=range(48),
                     progress_interval_s=5.0):
     r'''

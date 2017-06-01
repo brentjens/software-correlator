@@ -38,8 +38,8 @@ if __name__ == '__main__':
                         help='Directory in which to write the output files. Default: current directory.')
 
     parser.add_argument('-d', '--max-duration', metavar='SECONDS', type=float,
-                        default=100000.0,
-                        help='Number of seconds to correlate from beginning of observations. Default: 100000.')
+                        default=-1,
+                        help='Number of seconds to correlate from beginning of observations. Default: entire observation.')
 
     parser.add_argument('-i', '--integration-time', metavar='SECONDS', type=float,
                         default=0.1,
@@ -84,6 +84,8 @@ if __name__ == '__main__':
     logging.info(sys.argv)
     logging.info(args)
 
+    if args.max_duration < 0:
+        args.max_duration = None
 
     output_template = os.path.join(args.output_dir,'%(sas_id)s-%(antenna_set)s-%(obs_datetime)s-SB%(subband)03d.hdf5')
 
