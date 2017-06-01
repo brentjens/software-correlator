@@ -78,6 +78,8 @@ def cross_correlate(input_dir_name,
         max_duration_s = obs_header['TOTAL_INTEGRATION_TIME']
     max_samples = int(numpy.floor(max_duration_s / (512/100e6)))
     num_timeslots = int(numpy.floor((max_samples - samples_to_read)/samples_per_interval)+1)
+    logging.debug('cross_correlate(): max_duration_s(%f); max_samples(%d); num_timeslots(%d)',
+                  max_duration_s, max_samples, num_timeslots)
     for i, (x, y, time_axis, freq_axis) in enumerate(read_and_process_antenna_block_mp(
             input_dir_name, sas_id, sap_ids,
             fir_coefficients=fir_filter_coefficients(num_chan=num_chan, num_taps=num_taps),
@@ -90,6 +92,8 @@ def cross_correlate(input_dir_name,
             num_ant = x.shape[0]
             num_bl = (num_ant*(num_ant+1))//2
             num_rows = num_timeslots*num_bl
+            logging.debug('cross_correlate(): num_sb(%d); num_ant(%d); num_bl(%d); num_rows(%d);',
+                          num_sb, num_ant, num_bl, num_rows)
             current_row = 0
             h5_output_filenames = [output_filename_template % {'sas_id': sas_id,
                                                                'antenna_set': obs_header['ANTENNA_SET'].decode('utf8'),
