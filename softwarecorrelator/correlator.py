@@ -4,32 +4,12 @@ import h5py
 
 from .stationprocessing import read_and_process_antenna_block_mp, fir_filter_coefficients, samples_per_block
 from .inspect import find_sas_id, complex_voltage_obs_header
-
+from .vishdf5 import VisHDF5
 from lofarantpos.db import LofarAntennaDatabase
 
 
 
 
-
-
-
-def create_visibility_hdf5(file_name, num_timeslots, num_ant, num_chan, num_pol, num_sb=1):
-    num_bl = (num_ant*(num_ant+1))//2
-    num_rows = num_timeslots*num_bl*num_sb
-    h5file = h5py.File(file_name, mode='w-')
-    h5file.create_dataset('MAIN/DATA', (num_rows, num_chan, num_pol), dtype='c8')
-    h5file.create_dataset('MAIN/FLAG', (num_rows, num_chan, num_pol), dtype='b')
-    h5file.create_dataset('MAIN/ANTENNA1', (num_rows,), dtype='i4')
-    h5file.create_dataset('MAIN/ANTENNA2', (num_rows,), dtype='i4')
-    h5file.create_dataset('MAIN/DATA_DESC_ID', (num_rows,), dtype='i4')
-    h5file.create_dataset('MAIN/TIME', (num_rows,), dtype='f8')
-
-    h5file.create_dataset('SPECTRAL_WINDOW/NUM_CHAN', (num_sb, 1), dtype='i8')
-    h5file.create_dataset('SPECTRAL_WINDOW/CHAN_FREQ', (num_sb, num_chan), dtype='f8')
-
-    h5file.create_dataset('ANTENNA/NAME', (num_ant, 1), dtype='S512')
-    h5file.create_dataset('ANTENNA/ITRF', (num_ant, 3), dtype='f8')
-    return h5file
 
 
 def cross_correlate(input_dir_name, 
@@ -100,12 +80,12 @@ def cross_correlate(input_dir_name,
                                                                'obs_datetime': obs_datetime_compact,
                                                                'subband': sb}
                                    for sb in range(num_sb)]
-            h5_output_files = [create_visibility_hdf5(name,
-                                                      num_timeslots=num_timeslots,
-                                                      num_ant=num_ant,
-                                                      num_chan=num_chan,
-                                                      num_pol=4)
-                               for name in h5_output_filenames]
+            h5_output_files = [VisHDF5(name, mode='w-') for name in h5_output_filenames]
+            [h5.create_empty(num_timeslots=num_timeslots,
+                             num_ant=num_ant,
+                             num_chan=num_chan,
+                             num_pol=4)
+             for h5 in h5_output_files]
         # x and y original indices: [antenna, subband, timeslot, channel]
         # x and y new indices: [antenna, subband, channel, timeslot]
         # aim is to enable efficient summation of time axis.
