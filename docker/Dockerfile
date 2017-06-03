@@ -52,6 +52,12 @@ RUN  tar xvf lofar-antenna-positions-0.1-dev.tar.gz && \
      python3 setup.py install && \
      cd ../
 
+COPY ["etrs-itrs-0.1.tar.gz", "."]
+RUN  tar xvf etrs-itrs-0.1.tar.gz && \
+     cd etrs-itrs-0.1/ && \
+     python3 setup.py install && \
+     cd ../
+
 COPY ["software-correlator.tar.gz", "."]
 RUN  tar xvf software-correlator.tar.gz && \
      cd software-correlator*/ && \

@@ -36,6 +36,8 @@ class VisHDF5(h5py.File):
                           fillvalue=0.0+0.0j)
         h5.create_dataset('MAIN/FLAG', (num_rows, num_chan, num_pol), dtype='b',
                           fillvalue=False)
+        h5.create_dataset('MAIN/FLAGROW', (num_rows,), dtype='b',
+                          fillvalue=True)
         h5.create_dataset('MAIN/ANTENNA1', (num_rows,), dtype='i4',
                           fillvalue=-1)
         h5.create_dataset('MAIN/ANTENNA2', (num_rows,), dtype='i4',
@@ -52,7 +54,7 @@ class VisHDF5(h5py.File):
         h5.create_dataset('SPECTRAL_WINDOW/CHAN_FREQ', (num_sb, num_chan), dtype='f8',
                           fillvalue=0.0)
 
-        h5.create_dataset('ANTENNA/NAME', (num_ant, 1), dtype='S512',
+        h5.create_dataset('ANTENNA/NAME', (num_ant,), dtype='S512',
                           fillvalue=b'')
         h5.create_dataset('ANTENNA/ITRF', (num_ant, 3), dtype='f8',
                           fillvalue=0.0)
@@ -60,18 +62,17 @@ class VisHDF5(h5py.File):
 
     def fill_spectral_window(self, chan_freq_per_spw):
         self['SPECTRAL_WINDOW/NUM_CHAN'][:] = chan_freq_per_spw.shape[1]
-        self['SPECTRAL_WINDOW/CHAN_FREQ'] = chan_freq_per_spw
+        self['SPECTRAL_WINDOW/CHAN_FREQ'][:] = chan_freq_per_spw
 
 
     def fill_antenna(self, antenna_names, antenna_itrf):
-        self['ANTENNA/NAMES'] = antenna_names
-        self['ANTENNA/ITRF'] = antenna_itrf
+        self['ANTENNA/NAME'][:] = antenna_names
+        self['ANTENNA/ITRF'][:] = antenna_itrf
 
 
     def fill_main_header(self, main_header_dict):
-        self.attrs = main_header_dict
-        self.attrs['VISHDF5_VERSION'] = '1.0'
-
+        [self.attrs.create(key, value) for key, value in main_header_dict.items()]
+        self.attrs.create('VISHDF5_VERSION', b'1.0')
 
     def baseline_offset(self, antenna1, antenna2):
         h5 = self

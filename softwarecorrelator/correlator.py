@@ -1,12 +1,13 @@
 import numpy
 import logging
 import h5py
+import datetime
 
 from .stationprocessing import read_and_process_antenna_block_mp, fir_filter_coefficients, samples_per_block
 from .inspect import find_sas_id, complex_voltage_obs_header
 from .vishdf5 import VisHDF5
 from lofarantpos.db import LofarAntennaDatabase
-
+import etrsitrs
 
 
 
@@ -29,10 +30,16 @@ def cross_correlate(input_dir_name,
     db = LofarAntennaDatabase()
     
     obs_header = complex_voltage_obs_header(input_dir_name, sas_id)
-    obs_header['CORR_INTEGRATION_TIME'] = integration_s
-    obs_header['CORR_INTEGRATION_TIME_UNIT'] = b's'
-    obs_header['OBSERVATION_STATION_PHASE_CENTRES_ETRS'] = [
-        db.phase_centres[station.decode('utf8')]
+    epoch_str = obs_header['OBSERVATION_START_UTC'].decode('utf8')
+    dt = datetime.datetime(*[int(num.encode()) for num in (epoch_str.split('T')[0]).split('-')])
+    year = dt.timetuple().tm_year
+    day_of_year = dt.timetuple().tm_yday
+    epoch = year+(day_of_year/365.25)
+    obs_header['OBSERVATION_STATION_PHASE_CENTRES_ITRF'] = [
+        etrsitrs.convert(db.phase_centres[station.decode('utf8')],
+                         from_frame='ETRF2000',
+                         to_frame='ITRF2008',
+                         epoch=epoch)
         for station in obs_header['OBSERVATION_STATIONS_LIST']]
     obs_header['OBSERVATION_PQR_TO_ETRS_MATRICES'] = [
         db.pqr_to_etrs[station.decode('utf8')]
@@ -40,6 +47,7 @@ def cross_correlate(input_dir_name,
 
     obs_start_mjd_days = obs_header['OBSERVATION_START_MJD']
     obs_start_utc_str =  obs_header['OBSERVATION_START_UTC'].decode('utf8')
+    clock_hz = obs_header['CLOCK_FREQUENCY']*1e6
     obs_datetime_compact = ''.join([ch for ch in obs_start_utc_str[0:19] if ch not in '-:T'])
     obs_datetime_compact = '%s_%s' % (obs_datetime_compact[0:8], obs_datetime_compact[8:], )
     logging.info(obs_header)
@@ -52,11 +60,13 @@ def cross_correlate(input_dir_name,
     next_report_s = 0.0
     samples_per_interval, samples_to_read = samples_per_block(
         block_length_s=integration_s,
-        sample_duration_s=512/100e6,
+        sample_duration_s=1024/clock_hz,
         num_chan=num_chan, num_taps=num_taps)
+    obs_header['CORR_INTEGRATION_TIME'] = samples_per_interval*1024/clock_hz
+    obs_header['CORR_INTEGRATION_TIME_UNIT'] = b's'
     if max_duration_s is None:
         max_duration_s = obs_header['TOTAL_INTEGRATION_TIME']
-    max_samples = int(numpy.floor(max_duration_s / (512/100e6)))
+    max_samples = int(numpy.floor(max_duration_s / (1024.0/clock_hz)))
     num_timeslots = int(numpy.floor((max_samples - samples_to_read)/samples_per_interval)+1)
     logging.debug('cross_correlate(): max_duration_s(%f); max_samples(%d); num_timeslots(%d)',
                   max_duration_s, max_samples, num_timeslots)
@@ -81,11 +91,36 @@ def cross_correlate(input_dir_name,
                                                                'subband': sb}
                                    for sb in range(num_sb)]
             h5_output_files = [VisHDF5(name, mode='w-') for name in h5_output_filenames]
-            [h5.create_empty(num_timeslots=num_timeslots,
-                             num_ant=num_ant,
-                             num_chan=num_chan,
-                             num_pol=4)
-             for h5 in h5_output_files]
+            for freq0_hz, h5 in zip(freq_axis['AXIS_VALUES_WORLD'], h5_output_files):
+                h5.create_empty(num_timeslots=num_timeslots,
+                                num_ant=num_ant,
+                                num_chan=num_chan,
+                                num_pol=4)
+                h5.fill_main_header(obs_header)
+                subband_bandwidth = clock_hz/1024
+                channel_bandwidth = subband_bandwidth/num_chan
+                chan_freq = freq0_hz+(numpy.arange(num_chan) - num_chan//2)*channel_bandwidth
+                h5.fill_spectral_window(numpy.array([chan_freq]))
+                antenna_names = []
+                antenna_etrs = []
+                for field in obs_header['OBSERVATION_STATIONS_LIST']:
+                    antenna_names += [(field + b'-' + ant) for ant in obs_header['TARGETS']]
+                    if field[0:2] in [b'RS', b'CS']:
+                        if obs_header['ANTENNA_SET'] == b'LBA_OUTER':
+                            antenna_etrs += db.antenna_etrs(field.decode('utf8'))[48:,:].tolist()
+                        elif obs_header['ANTENNA_SET'] == b'LBA_INNER':
+                            antenna_etrs += db.antenna_etrs(field.decode('utf8'))[:48,:].tolist()
+                        else:
+                            antenna_etrs += db.antenna_etrs(field.decode('utf8')).tolist()
+                    else:
+                        antenna_etrs += db.antenna_etrs(field.decode('utf8')).tolist()
+                h5.fill_antenna(numpy.array(antenna_names),
+                                [etrsitrs.convert(etrs,
+                                                 from_frame='ETRF2000',
+                                                 to_frame='ITRF2008',
+                                                 epoch=epoch)
+                                 for etrs in antenna_etrs])
+
         # x and y original indices: [antenna, subband, timeslot, channel]
         # x and y new indices: [antenna, subband, channel, timeslot]
         # aim is to enable efficient summation of time axis.
@@ -110,9 +145,11 @@ def cross_correlate(input_dir_name,
                     bl += 1
             h5file['MAIN/DATA'][current_row:current_row+num_bl,:,:] = vis
             h5file['MAIN/FLAG'][current_row:current_row+num_bl,:,:] = flags
+            h5file['MAIN/FLAGROW'][current_row:current_row+num_bl] = False
             h5file['MAIN/ANTENNA1'][current_row:current_row+num_bl] = ant1
             h5file['MAIN/ANTENNA2'][current_row:current_row+num_bl] = ant2
             h5file['MAIN/TIME'][current_row:current_row+num_bl] = [obs_start_mjd_days*24*3600 + time_axis['REFERENCE_VALUE']]*num_bl
+            h5file['MAIN/TIMESLOT'][current_row:current_row+num_bl] = len(time_s)
         current_row += num_bl
         time_s.append(time_axis['REFERENCE_VALUE'])
 
