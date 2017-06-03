@@ -1,4 +1,5 @@
 import h5py
+import numpy
 import numpy.ma as ma
 import os
 
@@ -74,7 +75,7 @@ class VisHDF5(h5py.File):
 
     def baseline_offset(self, antenna1, antenna2):
         h5 = self
-        offset = arange(num_bl)[
+        offset = numpy.arange(self.num_bl)[
             numpy.logical_and(h5['MAIN/ANTENNA1'][:self.num_bl] == antenna1,
                               h5['MAIN/ANTENNA2'][:self.num_bl] == antenna2)]
         if len(offset) == 1:
@@ -85,7 +86,7 @@ class VisHDF5(h5py.File):
 
         
     def get_baseline_dynspec(self, antenna1, antenna2):
-        offset = baseline_offset(antenna1, antenna2)
+        offset = self.baseline_offset(antenna1, antenna2)
         data = self['MAIN/DATA'][offset::self.num_bl, ...]
         flag = self['MAIN/FLAG'][offset::self.num_bl, ...]
         return ma.array(data, mask=flag)
@@ -93,6 +94,6 @@ class VisHDF5(h5py.File):
 
     
     def set_baseline_flags(self, antenna1, antenna2, flags):
-        offset = baseline_offset(antenna1, antenna2)
+        offset = self.baseline_offset(antenna1, antenna2)
         self['MAIN/FLAG'][offset::self.num_bl, ...] = flags
 
