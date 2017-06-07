@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
 from distutils.core import setup
+from Cython.Build import cythonize
+import numpy
 from softwarecorrelator import __version__
 
 setup(name='software-correlator',
@@ -11,4 +13,6 @@ setup(name='software-correlator',
       url='https://www.astron.nl/~brentjens/',
       packages=['softwarecorrelator'],
       scripts=['bin/cvqa', 'bin/cvcorr'],
+      ext_modules=cythonize("softwarecorrelator/*.pyx"),
+      include_dirs=[numpy.get_include()],
      )
