@@ -65,16 +65,17 @@ cdef extern from "math.h":
 
 
 @cython.boundscheck(False) # uncommenting this will somewhat speed up end result
-def sum_threshold_cython_2d(data_2d_ma, threshold_sigma, window_lengths=[1, 2, 4, 8, 16, 32, 64, 128, 256]):
+def sum_threshold_cython_2d(data_2d, mask_2d, threshold_sigma, window_lengths=[1, 2, 4, 8, 16, 32, 64, 128, 256]):
     '''
     Expects zero-mean masked array
     flag per row in data_3d_ma
     '''
-    cdef np.ndarray[np.uint8_t, ndim=2, cast=True] new_mask = data_2d_ma.mask.copy()
-    cdef np.ndarray[np.uint8_t, ndim=2, cast=True] old_mask = data_2d_ma.mask.copy()
-    cdef np.ndarray[np.float32_t, ndim=2, cast=True] data = data_2d_ma.data.copy()
+    cdef np.ndarray[np.uint8_t, ndim=2, cast=True] new_mask = mask_2d.copy()
+    cdef np.ndarray[np.uint8_t, ndim=2, cast=True] old_mask = mask_2d.copy()
+    cdef np.ndarray[np.float32_t, ndim=2, cast=True] data = data_2d.data.copy()
     cdef np.ndarray[np.int64_t, ndim=1, cast=True] window_lengths_array = np.array(window_lengths)
-    cdef int num_rows        = data_2d_ma.shape[0]
+    cdef int num_rows        = data_2d.shape[0]
+    cdef int sequence_length = data_2d.shape[1]
     cdef int num_windows = window_lengths_array.shape[0]
     
     cdef double threshold_s = threshold_sigma
@@ -85,7 +86,6 @@ def sum_threshold_cython_2d(data_2d_ma, threshold_sigma, window_lengths=[1, 2, 4
     cdef int row=0
     cdef int window_length=0
     cdef int window_length_index=0
-    cdef int sequence_length = data_2d_ma.shape[1]
     cdef int j = 0
     cdef int w = 0
     with nogil, parallel():
@@ -123,14 +123,13 @@ def sum_threshold_cython_2d(data_2d_ma, threshold_sigma, window_lengths=[1, 2, 4
                 for j in range(sequence_length):
                     old_mask[row, j] = new_mask[row, j]
             #done!
-    data_2d_ma.mask = np.array(new_mask, dtype=np.bool)
-    return data_2d_ma
+    return new_mask
 
 
 
 
 
-def sum_threshold_2d(dynamic_spectrum, threshold_sigma, window_lengths=[1, 2, 4, 8, 16, 32]):
+def sum_threshold_2d(dynamic_spectrum, mask, threshold_sigma, window_lengths=[1, 2, 4, 8, 16, 32]):
     '''dynamic_spectrum must contain real values and have mean subtracted, for example the abs(vis) or abs(xx-yy)
     **Parameters**
 
@@ -147,11 +146,7 @@ def sum_threshold_2d(dynamic_spectrum, threshold_sigma, window_lengths=[1, 2, 4,
     cdef int num_freqs = dynamic_spectrum.shape[1]
     window_lengths_time = [wl for wl in window_lengths if wl < num_times]
     window_lengths_freq = [wl for wl in window_lengths if wl < num_freqs]
-    #logging.debug('Flagging by time')
-    by_time = sum_threshold_cython_2d(dynamic_spectrum.T.copy(), threshold_sigma, window_lengths_time).T.copy()
-
-    #logging.debug('Flagging by frequency')
-    by_frequency = sum_threshold_cython_2d(by_time, threshold_sigma, window_lengths_freq)
-
-    dynamic_spectrum.mask = by_frequency.mask
-    return dynamic_spectrum
+    by_time_mask = sum_threshold_cython_2d(dynamic_spectrum.T.copy(), mask.T.copy(),
+                                           threshold_sigma, window_lengths_time).T.copy()
+    by_frequency_mask = sum_threshold_cython_2d(dynamic_spectrum, by_time_mask, threshold_sigma, window_lengths_freq)
+    return by_frequency_mask
