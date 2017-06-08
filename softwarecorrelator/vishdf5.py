@@ -98,3 +98,71 @@ class VisHDF5(h5py.File):
         offset = self.baseline_offset(antenna1, antenna2)
         self['MAIN/FLAG'][offset::self.num_bl, ...] = flags
 
+
+
+    def bytes_per_timeslot_data_flags(self):
+        bytes_per_vis = 9
+        num_vis = self.num_bl*self['MAIN/DATA'].shape[1]*self['MAIN/DATA'].shape[2]
+        return num_vis*bytes_per_vis
+
+
+    def bytes_per_baseline_data_flags(self):
+        bytes_per_vis = 9
+        num_vis = numpy.product(self['MAIN/DATA'].shape)//self.num_bl
+        return num_vis*bytes_per_vis
+
+
+    def get_acm_blocks(self, first_timeslot, max_num_timeslots):
+        bl = self.num_bl
+        first = first_timeslot
+        n = max_num_timeslots
+        num_ch = self['MAIN/DATA'][first*bl:(first+n)*bl,...].shape[1]
+        num_pol = self['MAIN/DATA'][first*bl:(first+n)*bl,...].shape[2]
+        return ma.array(self['MAIN/DATA'][first*bl:(first+n)*bl,...].reshape((-1, bl, num_ch, num_pol)),
+                        mask = self['MAIN/FLAG'][first*bl:(first+n)*bl,...].reshape((-1, bl, num_ch, num_pol)))
+
+
+    def get_baseline_blocks(self, first_baseline, max_num_baselines, buffer=None):
+        bl = self.num_bl
+        first = first_baseline
+        num_baselines = min(max_num_baselines, bl-first_baseline)
+        n_timeslots = self['MAIN/DATA'].shape[0]//self.num_bl
+        num_ch = self['MAIN/DATA'].shape[-2]
+        num_pol = self['MAIN/DATA'].shape[-1]
+        if num_baselines <= 0:
+            return buffer, 0
+#            raise ValueError('No more baselines to read')
+        if buffer is None:
+            data = numpy.zeros((n_timeslots, num_baselines, num_ch, num_pol),
+                               dtype=numpy.complex64)
+            mask = numpy.zeros(data.shape, dtype=numpy.bool)
+        else:
+            data = buffer.data
+            mask = buffer.mask
+        data_group = self['MAIN/DATA']
+        for ts in range(n_timeslots):
+            data_group.read_direct(
+                data,
+                numpy.s_[ts*bl+first:ts*bl+first+num_baselines,:,:],
+                numpy.s_[ts,0:num_baselines,:,:])
+        flag_group = self['MAIN/FLAG']
+        for ts in range(n_timeslots):
+            flag_group.read_direct(
+                mask,
+                numpy.s_[ts*bl+first:ts*bl+first+num_baselines,:,:],
+                numpy.s_[ts,0:num_baselines,:,:])
+        return ma.array(data, mask=mask), num_baselines
+
+
+    def set_baseline_block_col(self, x, column, first_baseline, max_num_baselines):
+        r'''
+        column = 'DATA' or 'FLAG'.
+        '''
+        bl = self.num_bl
+        first = first_baseline
+        num_baselines = x.shape[1]
+        n_timeslots = self['MAIN/DATA'].shape[0]//self.num_bl
+        num_ch = self['MAIN/DATA'].shape[-2]
+        num_pol = self['MAIN/DATA'].shape[-1]
+        for ts in range(n_timeslots):
+            self['MAIN/'+column][ts*bl+first:ts*bl+first+num_baselines,:,:] = x[ts,:,:,:]
