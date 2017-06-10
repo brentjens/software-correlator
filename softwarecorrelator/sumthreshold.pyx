@@ -11,9 +11,9 @@ def sum_threshold_cython_1d(sequence_ma, threshold_sigma, window_lengths=[1, 2, 
     '''
     Expects zero-mean masked array
     '''
-    cdef np.ndarray[np.uint8_t, ndim=1, cast=True] new_mask = sequence_ma.mask.copy()
-    cdef np.ndarray[np.uint8_t, ndim=1, cast=True] old_mask = sequence_ma.mask.copy()
-    cdef np.ndarray[np.float32_t, ndim=1, cast=True] data = sequence_ma.data.copy()
+    cdef np.ndarray[np.uint8_t, ndim=1, cast=True] new_mask = np.copy(sequence_ma.mask)
+    cdef np.ndarray[np.uint8_t, ndim=1, cast=True] old_mask = np.copy(sequence_ma.mask)
+    cdef np.ndarray[np.float32_t, ndim=1, cast=True] data = np.copy(sequence_ma.data)
     cdef double threshold = threshold_sigma
     cdef double z_sum = 0.0
     cdef int index = 0
@@ -70,9 +70,9 @@ def sum_threshold_cython_2d(data_2d, mask_2d, threshold_sigma, window_lengths=[1
     Expects zero-mean masked array
     flag per row in data_3d_ma
     '''
-    cdef np.ndarray[np.uint8_t, ndim=2, cast=True] new_mask = mask_2d.copy()
-    cdef np.ndarray[np.uint8_t, ndim=2, cast=True] old_mask = mask_2d.copy()
-    cdef np.ndarray[np.float32_t, ndim=2, cast=True] data = data_2d.data.copy()
+    cdef np.ndarray[np.uint8_t, ndim=2, cast=True] new_mask = np.copy(mask_2d)
+    cdef np.ndarray[np.uint8_t, ndim=2, cast=True] old_mask = np.copy(mask_2d)
+    cdef np.ndarray[np.float32_t, ndim=2, cast=True] data = np.copy(data_2d.data)
     cdef np.ndarray[np.int64_t, ndim=1, cast=True] window_lengths_array = np.array(window_lengths)
     cdef int num_rows        = data_2d.shape[0]
     cdef int sequence_length = data_2d.shape[1]
