@@ -60,6 +60,20 @@ class VisHDF5(h5py.File):
                           fillvalue=0.0)
 
 
+
+
+    def add_weight_col(self):
+        try:
+            _ = self['MAIN/VISWEIGHT'][0]
+            logging.warning('MAIN/VISWEIGHT already exists in %s',
+                            self.filename)
+        except:
+            logging.info('Creating MAIN/VISWEIGHT in %s',
+                         self.filename)
+            self.create_dataset('MAIN/VISWEIGHT', self['MAIN/DATA'].shape, dtype='f8',
+                                fillvalue=0.0)
+
+
     def fill_spectral_window(self, chan_freq_per_spw):
         self['SPECTRAL_WINDOW/NUM_CHAN'][:] = chan_freq_per_spw.shape[1]
         self['SPECTRAL_WINDOW/CHAN_FREQ'][:] = chan_freq_per_spw
