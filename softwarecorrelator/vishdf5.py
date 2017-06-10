@@ -168,7 +168,7 @@ class VisHDF5(h5py.File):
         return ma.array(data, mask=mask), num_baselines
 
 
-    def set_baseline_block_col(self, x, column, first_baseline, max_num_baselines):
+    def set_baseline_block_col(self, x, column, first_baseline):
         r'''
         column = 'DATA' or 'FLAG'.
         '''
