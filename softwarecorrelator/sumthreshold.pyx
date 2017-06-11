@@ -65,10 +65,12 @@ cdef extern from "math.h":
 
 
 @cython.boundscheck(False) # uncommenting this will somewhat speed up end result
-def sum_threshold_cython_2d(data_2d, mask_2d, threshold_sigma, window_lengths=[1, 2, 4, 8, 16, 32, 64, 128, 256]):
+def sum_threshold_cython_2d(data_2d, mask_2d, threshold_sigma, window_lengths=[1, 2, 4, 8, 16, 32, 64, 128, 256], threshold_shrink_power=0.45):
     '''
     Expects zero-mean masked array
     flag per row in data_3d_ma
+
+    Offringa uses approx. 0.6 for threshold_shrink_power
     '''
     cdef np.ndarray[np.uint8_t, ndim=2, cast=True] new_mask = np.copy(mask_2d)
     cdef np.ndarray[np.uint8_t, ndim=2, cast=True] old_mask = np.copy(mask_2d)
@@ -80,6 +82,7 @@ def sum_threshold_cython_2d(data_2d, mask_2d, threshold_sigma, window_lengths=[1
     
     cdef double threshold_s = threshold_sigma
     cdef double threshold = threshold_sigma
+    cdef double tsp = threshold_shrink_power
     cdef np.ndarray[np.float64_t, ndim=1, cast=True] z_sum = np.zeros(num_rows)
     cdef np.ndarray[np.int64_t, ndim=1, cast=True] index = np.zeros(num_rows)
     cdef np.ndarray[np.int64_t, ndim=1, cast=True] count = np.zeros(num_rows)
@@ -92,7 +95,7 @@ def sum_threshold_cython_2d(data_2d, mask_2d, threshold_sigma, window_lengths=[1
         for row in prange(num_rows):
             for window_length_index in range(num_windows):
                 w = window_lengths_array[window_length_index]
-                threshold = threshold_s/(pow(w, 0.35))
+                threshold = threshold_s/(pow(w, tsp))
                 z_sum[row] = 0.0
                 index[row] = 0
                 count[row] = 0
@@ -129,7 +132,7 @@ def sum_threshold_cython_2d(data_2d, mask_2d, threshold_sigma, window_lengths=[1
 
 
 
-def sum_threshold_2d(dynamic_spectrum, mask, threshold_sigma, window_lengths=[1, 2, 4, 8, 16, 32]):
+def sum_threshold_2d(dynamic_spectrum, mask, threshold_sigma, window_lengths=[1, 2, 4, 8, 16, 32], threshold_shrink_power=0.45):
     '''dynamic_spectrum must contain real values and have mean subtracted, for example the abs(vis) or abs(xx-yy)
     **Parameters**
 
@@ -141,12 +144,23 @@ def sum_threshold_2d(dynamic_spectrum, mask, threshold_sigma, window_lengths=[1,
 
     window_lengths : list of ints
         Default = [1, 2, 4, 8, 16, 32]
+
+    Offringa uses approx. 0.6 for threshold_shrink_power 5 sigma,
+    pow=0.45 seems to work well for 128 channels/0.1 s LBA station
+    data.
     '''
     cdef int num_times = dynamic_spectrum.shape[0]
     cdef int num_freqs = dynamic_spectrum.shape[1]
     window_lengths_time = [wl for wl in window_lengths if wl < num_times]
     window_lengths_freq = [wl for wl in window_lengths if wl < num_freqs]
-    by_time_mask = sum_threshold_cython_2d(dynamic_spectrum.T.copy(), mask.T.copy(),
-                                           threshold_sigma, window_lengths_time).T.copy()
-    by_frequency_mask = sum_threshold_cython_2d(dynamic_spectrum, by_time_mask, threshold_sigma, window_lengths_freq)
+    by_time_mask = sum_threshold_cython_2d(
+        dynamic_spectrum.T.copy(), mask.T.copy(),
+        threshold_sigma,
+        window_lengths_time,
+        threshold_shrink_power=threshold_shrink_power).T.copy()
+    by_frequency_mask = sum_threshold_cython_2d(
+        dynamic_spectrum, by_time_mask,
+        threshold_sigma,
+        window_lengths_freq,
+        threshold_shrink_power=threshold_shrink_power)
     return by_frequency_mask

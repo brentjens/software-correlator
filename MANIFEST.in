@@ -2,3 +2,4 @@ include *.sh
 include Makefile
 recursive-include docker Dockerfile bashrc *.sh
 recursive-include docker/bashrc.d *
+include softwarecorrelator/*.pyx

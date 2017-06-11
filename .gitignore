@@ -6,3 +6,4 @@ dist/
 softwarecorrelator/__pycache__/
 .coverage
 coverage/
+softwarecorrelator/sumthreshold.c

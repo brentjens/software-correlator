@@ -119,11 +119,12 @@ def flag_and_average(input_filename, output_filename,
 
 
 def flag_dataset(input_filename,
-                 flagging_threshold=4.0,
+                 flagging_threshold=5.0,
                  propagate_flags=['pol'],
                  max_mem_GB=8.0,
                  unflag_channels=[],
-                 close_gaps=True):
+                 close_gaps=True,
+                 threshold_shrink_power=0.45):
     input_mode = 'r+'
     input_h5 = VisHDF5(input_filename, mode=input_mode)
     num_pol = input_h5['MAIN/DATA'].shape[-1]
@@ -152,7 +153,8 @@ def flag_dataset(input_filename,
                 flags = sum_threshold_2d(frame_data,
                                          numpy.copy(buffer.mask[:, bl, :, pol]),
                                          flagging_threshold,
-                                         window_lengths=flag_window_lengths)
+                                         window_lengths=flag_window_lengths,
+                                         threshold_shrink_power=threshold_shrink_power)
                 buffer.mask[:, bl, :, pol] = flags
             if 'pol' in propagate_flags:
                 buffer.mask[:, bl, :, :] = buffer.mask[:, bl, :, :].max(axis=-1)[:,:,numpy.newaxis]
