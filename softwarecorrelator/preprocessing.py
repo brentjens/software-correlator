@@ -162,7 +162,8 @@ def flag_dataset(input_filename,
             closed_gaps = buffer.mask.copy()
             closed_gaps[:,:,1:-1,:] = numpy.logical_or(
                 closed_gaps[:,:,1:-1,:],
-                (buffer.mask[:,:,2:,:]+buffer.mask[:,:,0:-2,:])==2)
+                numpy.logical_and(buffer.mask[:,:,2:,:],
+                                  buffer.mask[:,:,0:-2,:]))
             buffer.mask = closed_gaps
             closed_gaps = None
             gc.collect()
