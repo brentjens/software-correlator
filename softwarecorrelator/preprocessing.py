@@ -168,7 +168,7 @@ def flag_dataset(input_filename,
             gc.collect()
         
         input_h5.set_baseline_block_col(
-            buffer.mask,
+            buffer.mask[:,:num_read,:,:],
             column='FLAG',
             first_baseline=block_index*baselines_per_chunk)
         
