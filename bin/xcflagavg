@@ -56,7 +56,11 @@ if __name__ == '__main__':
                         default=8,
                         help='First channel to start averaging at. Default: 8')
 
+    parser.add_argument('--flag-data', metavar='DO_FLAG', type=int,
+                        default=1,
+                        help='Should the original data set be flagged first? Default: True')
 
+    
     parser.add_argument('-l', '--logging', metavar='LOGLEVEL', type=str,
                         choices=['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG'],
                         default='INFO',
@@ -91,18 +95,19 @@ if __name__ == '__main__':
 
     for name in args.filenames:
         try:
-            logging.info('%s: clearing flags', name)
-            clear_flags(name)
-            logging.info('%s: flagging', name)
-            flag_dataset(name,
-                         flagging_threshold=5.0,
-                         unflag_channels=[64],
-                         max_mem_GB=args.max_mem_gb, close_gaps=True,
-                         threshold_shrink_power=0.45)
+            if args.flag_data:
+                logging.info('%s: clearing flags', name)
+                clear_flags(name)
+                logging.info('%s: flagging', name)
+                flag_dataset(name,
+                             flagging_threshold=5.0,
+                             unflag_channels=[64],
+                             max_mem_GB=args.max_mem_gb, close_gaps=True,
+                             threshold_shrink_power=0.45)
             avg_name = os.path.join(os.path.dirname(name),
                                     os.path.basename(name).split('.')[0]+'-avg.hdf5')
             logging.info('%s: averaging to %s', name, avg_name)
-            average_dataset(h5_name, avg_name, apply_flags=False,
+            average_dataset(name, avg_name, apply_flags=False,
                             output_channel_mapping=[(args.start_channel, args.start_channel+args.channel_avg_factor)],
                             time_avg_factor=args.time_avg_factor,
                             max_mem_GB=args.max_mem_gb//2)
@@ -110,10 +115,10 @@ if __name__ == '__main__':
             avg_flg_name = os.path.join(os.path.dirname(name),
                                         os.path.basename(name).split('.')[0]+'-avg-flagged.hdf5')
             logging.info('%s: averaging to %s', name, avg_flg_name)
-            average_dataset(h5_name, avg_flg_name, apply_flags=True,
+            average_dataset(name, avg_flg_name, apply_flags=True,
                             output_channel_mapping=[(args.start_channel, args.start_channel+args.channel_avg_factor)],
                             time_avg_factor=args.time_avg_factor,
                             max_mem_GB=args.max_mem_gb//2)
-        except e:
+        except:
             logging.error('%s', sys.exc_info()[0])
             pass
