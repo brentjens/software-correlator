@@ -1,0 +1,119 @@
+#!/usr/bin/env python
+import matplotlib
+matplotlib.use('Agg')
+import argparse
+import sys, os, socket
+import logging
+import multiprocessing as mp
+
+from softwarecorrelator import __version__
+from softwarecorrelator.utilities import parse_subband_list
+from softwarecorrelator.preprocessing import flag_dataset, clear_flags, average_dataset
+
+
+
+def kill_children(exctype, value, traceback):
+    global ORIGINAL_EXCEPTHOOK
+    for process in mp.active_children():
+        process.terminate()
+    ORIGINAL_EXCEPTHOOK(exctype, value, traceback)
+
+
+if __name__ == '__main__':
+    ORIGINAL_EXCEPTHOOK = sys.excepthook
+    sys.excepthook = kill_children
+    
+    #
+    # Commandline parsing
+    #
+    parser = argparse.ArgumentParser(
+        description='Preprocess raw cross correlation visibility sets by flagging and averaging.')
+#    parser.add_argument('directory', metavar='DIR', type=str, nargs=1,
+#                        help='Directory containing HDF5 files and raw files for one LOFAR observation.')
+
+    parser.add_argument('-v', '--version', action='version',
+                        version='%(prog)s '+__version__+' (c) 2017 M.A. Brentjens <brentjens@astron.nl>')
+
+    parser.add_argument('-o', '--output-dir', metavar='DIRECTORY', type=str,
+                        default=os.getcwd(),
+                        help='Directory in which to write the output files. Default: current directory.')
+
+
+    parser.add_argument('-t', '--time-avg-factor', metavar='TIME_AVG', type=int,
+                        default=10,
+                        help='Number of timeslots to average into a new timeslot. Default: 10')
+
+
+    parser.add_argument('-c', '--channel-avg-factor', metavar='CHAN_AVG', type=int,
+                        default=112,
+                        help='Number of channels to average into a new one. Default: 112')
+    
+    parser.add_argument('-m', '--max-mem-gb', metavar='GB', type=int,
+                        default=8,
+                        help='Maximum amount of memory to use. Default: 8.')
+    
+    parser.add_argument('-s', '--start_channel', metavar='START_CHAN', type=int,
+                        default=8,
+                        help='First channel to start averaging at. Default: 8')
+
+
+    parser.add_argument('-l', '--logging', metavar='LOGLEVEL', type=str,
+                        choices=['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG'],
+                        default='INFO',
+                        help='Minimum log intensity level. Choose one of "CRITICAL", "ERROR", "WARNING", "INFO", or "DEBUG"')
+
+    parser.add_argument('filenames', metavar='FILENAME', type=str, nargs='+',
+                        help='Files to preprocess (flag and average)')
+
+    args = parser.parse_args()
+
+
+    #
+    # Logging setup
+    #
+    logger = logging.getLogger()
+    loglevel = {'INFO':  logging.INFO,
+                'DEBUG': logging.DEBUG,
+                'WARNING': logging.WARNING,
+                'CRITICAL': logging.CRITICAL,
+                'ERROR': logging.ERROR}[args.logging]
+    logger.setLevel(loglevel)
+    formatter = logging.Formatter('XCFLAG %(asctime)s: %(levelname)s: %(message)s')
+
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(loglevel)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+
+    logging.info('New call to XCFLAG on host %s', socket.gethostname())
+    logging.info(sys.argv)
+    logging.info(args)
+
+    for name in args.filenames:
+        try:
+            logging.info('%s: clearing flags', name)
+            clear_flags(name)
+            logging.info('%s: flagging', name)
+            flag_dataset(name,
+                         flagging_threshold=5.0,
+                         unflag_channels=[64],
+                         max_mem_GB=args.max_mem_gb, close_gaps=True,
+                         threshold_shrink_power=0.45)
+            avg_name = os.path.join(os.path.dirname(name),
+                                    os.path.basename(name).split('.')[0]+'-avg.hdf5')
+            logging.info('%s: averaging to %s', name, avg_name)
+            average_dataset(h5_name, avg_name, apply_flags=False,
+                            output_channel_mapping=[(args.start_channel, args.start_channel+args.channel_avg_factor)],
+                            time_avg_factor=args.time_avg_factor,
+                            max_mem_GB=args.max_mem_gb//2)
+
+            avg_flg_name = os.path.join(os.path.dirname(name),
+                                        os.path.basename(name).split('.')[0]+'-avg-flagged.hdf5')
+            logging.info('%s: averaging to %s', name, avg_flg_name)
+            average_dataset(h5_name, avg_flg_name, apply_flags=True,
+                            output_channel_mapping=[(args.start_channel, args.start_channel+args.channel_avg_factor)],
+                            time_avg_factor=args.time_avg_factor,
+                            max_mem_GB=args.max_mem_gb//2)
+        except e:
+            logging.error('%s', sys.exc_info()[0])
+            pass
