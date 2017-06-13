@@ -132,13 +132,18 @@ class VisHDF5(h5py.File):
         n = max_num_timeslots
         num_ch = self['MAIN/DATA'][first*bl:(first+n)*bl,...].shape[1]
         num_pol = self['MAIN/DATA'][first*bl:(first+n)*bl,...].shape[2]
-        return {'DATA': ma.array(self['MAIN/DATA'][first*bl:(first+n)*bl,...].reshape((-1, bl, num_ch, num_pol)),
-                                 mask = self['MAIN/FLAG'][first*bl:(first+n)*bl,...].reshape((-1, bl, num_ch, num_pol))),
-                'TIME': self['MAIN/TIME'][first*bl:(first+n)*bl:bl],
-                'ANTENNA1': self['MAIN/ANTENNA1'][first*bl:(first+1)*bl],
-                'ANTENNA2': self['MAIN/ANTENNA2'][first*bl:(first+1)*bl],
-                'DATA_DESC_ID': self['MAIN/DATA_DESC_ID'][first*bl:(first+n)*bl:bl],
-                }
+        return_dict =  {
+            'DATA': ma.array(self['MAIN/DATA'][first*bl:(first+n)*bl,...].reshape((-1, bl, num_ch, num_pol)),
+                             mask = self['MAIN/FLAG'][first*bl:(first+n)*bl,...].reshape((-1, bl, num_ch, num_pol))),
+            'TIME': self['MAIN/TIME'][first*bl:(first+n)*bl:bl],
+            'ANTENNA1': self['MAIN/ANTENNA1'][first*bl:(first+1)*bl],
+            'ANTENNA2': self['MAIN/ANTENNA2'][first*bl:(first+1)*bl],
+            'DATA_DESC_ID': self['MAIN/DATA_DESC_ID'][first*bl:(first+n)*bl:bl],
+            'VIS_WEIGHT': None
+        }
+        if 'MAIN/VISWEIGHT' in self:
+            return_dict['VISWEIGHT'] = self['MAIN/VISWEIGHT'][first*bl:(first+n)*bl,...].reshape((-1, bl, num_ch, num_pol))
+        return return_dict
 
 
     def get_baseline_blocks(self, first_baseline, max_num_baselines, buffer=None):
