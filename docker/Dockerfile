@@ -39,7 +39,8 @@ RUN apt-get install -y sudo rsync ssh \
         python3-h5py \
         python3-matplotlib \
         python3-numpy \
-        python3-scipy 
+        python3-scipy \
+        python3-astropy
 
 #libcfitsio-bin libcfitsio-dev libwcs5 libfftw3-bin libhdf5-10 libboost-python${BOOST_VERSION}.0
 
