@@ -1,4 +1,8 @@
 import numpy
+from  astropy.coordinates.name_resolve import get_icrs_coordinates
+import astropy.coordinates as acc
+import softwarecorrelator.coordinates as scc
+
 
 def baseline_matrix_m(positions_m):
     r'''
@@ -292,3 +296,52 @@ class MatrixImager(object):
             self.min_baseline_lambda,
             self.max_baseline_lambda)
         return self.predict_matrix
+
+
+
+
+
+
+
+class SkyModel(object):
+    def __init__(self, pqr_to_itrs_matrix, observing_location_itrs,
+                 sources=None):
+        r'''
+        sources: dict
+            Name: ICRS SkyCoord.
+        '''
+        if sources is None:
+            source_names = ['Cas A', 'Cyg A', 'Vir A', 'Her A', 'Tau A', 'Per A',
+                            '3C 353', '3C 123', '3C 295', '3C 196', 'DR 4', 'DR 23', 'DR 21']
+            source_icrs = [get_icrs_coordinates(source)
+                           for source in source_names]
+            self.sources = {name: icrs for name, icrs in zip(source_names, source_icrs)}
+        else:
+            self.sources = sources
+        self.pqr_to_itrs_matrix = pqr_to_itrs_matrix
+        xyz = observing_location_itrs
+        self.obsgeoloc = acc.CartesianRepresentation(
+            x=xyz[0], y=xyz[1], z=xyz[2], unit='m')
+
+
+
+    def source_lmn_rad(self, obstime, include_sun=True):
+        gcrs = acc.GCRS(obstime=obstime, obsgeoloc=self.obsgeoloc)
+        gcrs_dict = {name: icrs.transform_to(gcrs)
+                     for name, icrs in self.sources.items()}
+        if include_sun:
+            sun = acc.get_sun(obstime)
+            gcrs_dict['Sun'] = sun.transform_to(gcrs)
+        lmn_dict = {name: scc.pqr_from_icrs(
+            numpy.array([gcrs.ra.rad, gcrs.dec.rad]),
+            obstime=obstime,
+            pqr_to_itrs_matrix=self.pqr_to_itrs_matrix)
+                    for name, gcrs in gcrs_dict.items()}
+        return lmn_dict
+
+
+    def above_horizon(self, obstime, include_sun=True):
+        lmn_dict = self.source_lmn_rad(obstime, include_sun)
+        names = [name for name, lmn in lmn_dict.items() if lmn[2] >= 0.0]
+        lmn = numpy.array([lmn_dict[name] for name in names])
+        return names, lmn
