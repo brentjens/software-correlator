@@ -120,5 +120,5 @@ if __name__ == '__main__':
                             time_avg_factor=args.time_avg_factor,
                             max_mem_GB=args.max_mem_gb//2)
         except:
-            logging.error('%s', sys.exc_info()[0])
+            logging.error('%s: %s\n%s', (sys.exc_info()[0], sys.exc_info()[1], sys.exc_info()[2]))
             pass
