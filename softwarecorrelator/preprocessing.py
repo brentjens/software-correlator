@@ -126,6 +126,7 @@ def flag_dataset(input_filename,
                  unflag_channels=[],
                  close_gaps=True,
                  threshold_shrink_power=0.45):
+    logging.info('flag_dataset(input_filename=%r)', input_filename)
     input_mode = 'r+'
     input_h5 = VisHDF5(input_filename, mode=input_mode)
     num_pol = input_h5['MAIN/DATA'].shape[-1]
