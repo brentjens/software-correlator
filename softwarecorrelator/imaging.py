@@ -282,9 +282,15 @@ class MatrixImager(object):
         self.predict_matrix = None
 
 
-    def dft_image(self, acm_vector):
+    def dft_image(self, acm_vector, weights=None):
         n = self.num_pixels
-        return numpy.dot(self.matrix, acm_vector).real.reshape((n, n))
+        if weights is None:
+            wsum = weights.sum()
+            wlen = len(weights)
+            mat = self.matrix*weights[numpy.newaxis,:]*wlen/wsum
+        else:
+            mat = self.matrix
+        return numpy.dot(mat, acm_vector).real.reshape((n, n))
 
 
     def compute_predict_matrix(self, source_lmn_rad):
@@ -345,3 +351,5 @@ class SkyModel(object):
         names = [name for name, lmn in lmn_dict.items() if lmn[2] >= 0.0]
         lmn = numpy.array([lmn_dict[name] for name in names])
         return names, lmn
+
+
