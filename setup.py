@@ -24,6 +24,6 @@ setup(name='software-correlator',
       author_email='brentjens@astron.nl',
       url='https://www.astron.nl/~brentjens/',
       packages=['softwarecorrelator'],
-      scripts=['bin/cvqa', 'bin/cvcorr'],
+      scripts=['bin/cvqa', 'bin/cvcorr', 'bin/xcflagavg'],
       ext_modules=cythonize(ext_modules, force=True),
      )
