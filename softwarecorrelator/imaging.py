@@ -285,9 +285,11 @@ class MatrixImager(object):
     def dft_image(self, acm_vector, weights=None):
         n = self.num_pixels
         if weights is None:
-            wsum = weights.sum()
-            wlen = len(weights)
-            mat = self.matrix*weights[numpy.newaxis,:]*wlen/wsum
+            matrix_weights = numpy.abs(matrix).mean(axis=0)
+            w = weights*matrix_weights
+            wsum = w.sum()
+            wlen = len(w)
+            mat = self.matrix*w[numpy.newaxis,:]*wlen/wsum
         else:
             mat = self.matrix
         return numpy.dot(mat, acm_vector).real.reshape((n, n))

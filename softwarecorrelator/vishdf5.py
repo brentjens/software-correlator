@@ -62,16 +62,19 @@ class VisHDF5(h5py.File):
 
 
 
-    def add_weight_col(self):
+    def add_data_col(self, col_name, dtype='c8', fillvalue=0.0):
         try:
-            _ = self['MAIN/VISWEIGHT'][0]
-            logging.warning('MAIN/VISWEIGHT already exists in %s',
-                            self.filename)
+            _ = self['MAIN/'+col_name][0]
+            logging.warning('MAIN/%s already exists in %s',
+                            col_name, self.filename)
         except:
-            logging.info('Creating MAIN/VISWEIGHT in %s',
-                         self.filename)
-            self.create_dataset('MAIN/VISWEIGHT', self['MAIN/DATA'].shape, dtype='f8',
-                                fillvalue=0.0)
+            logging.info('Creating MAIN/%s in %s',
+                         col_nameself.filename)
+            self.create_dataset('MAIN/'+col_name, self['MAIN/DATA'].shape, dtype=dtype,
+                                fillvalue=fillvalue)
+
+    def add_weight_col(self):
+        return self.add_data_col('VIS_WEIGHT', dtype='f8', fillvalue=0.0)
 
 
     def fill_spectral_window(self, chan_freq_per_spw):
@@ -126,14 +129,15 @@ class VisHDF5(h5py.File):
         return num_vis*bytes_per_vis
 
 
-    def get_acm_blocks(self, first_timeslot, max_num_timeslots):
+    def get_acm_blocks(self, first_timeslot, max_num_timeslots, col_name='DATA'):
         bl = self.num_bl
         first = first_timeslot
         n = max_num_timeslots
-        num_ch = self['MAIN/DATA'][first*bl:(first+n)*bl,...].shape[1]
-        num_pol = self['MAIN/DATA'][first*bl:(first+n)*bl,...].shape[2]
+        col = 'MAIN/'+col_name
+        num_ch = self[col][first*bl:(first+n)*bl,...].shape[1]
+        num_pol = self[col][first*bl:(first+n)*bl,...].shape[2]
         return_dict =  {
-            'DATA': ma.array(self['MAIN/DATA'][first*bl:(first+n)*bl,...].reshape((-1, bl, num_ch, num_pol)),
+            'DATA': ma.array(self[col][first*bl:(first+n)*bl,...].reshape((-1, bl, num_ch, num_pol)),
                              mask = self['MAIN/FLAG'][first*bl:(first+n)*bl,...].reshape((-1, bl, num_ch, num_pol))),
             'TIME': self['MAIN/TIME'][first*bl:(first+n)*bl:bl],
             'ANTENNA1': self['MAIN/ANTENNA1'][first*bl:(first+1)*bl],
@@ -146,13 +150,14 @@ class VisHDF5(h5py.File):
         return return_dict
 
 
-    def get_baseline_blocks(self, first_baseline, max_num_baselines, buffer=None):
+    def get_baseline_blocks(self, first_baseline, max_num_baselines, buffer=None, col_name='DATA'):
         bl = self.num_bl
         first = first_baseline
         num_baselines = min(max_num_baselines, bl-first_baseline)
-        n_timeslots = self['MAIN/DATA'].shape[0]//self.num_bl
-        num_ch = self['MAIN/DATA'].shape[-2]
-        num_pol = self['MAIN/DATA'].shape[-1]
+        col = 'MAIN/'+col_name
+        n_timeslots = self[col].shape[0]//self.num_bl
+        num_ch = self[col].shape[-2]
+        num_pol = self[col].shape[-1]
         if num_baselines <= 0:
             return buffer, 0
 #            raise ValueError('No more baselines to read')
@@ -163,7 +168,7 @@ class VisHDF5(h5py.File):
         else:
             data = buffer.data
             mask = buffer.mask
-        data_group = self['MAIN/DATA']
+        data_group = self[col]
         for ts in range(n_timeslots):
             data_group.read_direct(
                 data,
@@ -178,9 +183,9 @@ class VisHDF5(h5py.File):
         return ma.array(data, mask=mask), num_baselines
 
 
-    def set_baseline_block_col(self, x, column, first_baseline):
+    def set_baseline_block_col(self, x, col_name, first_baseline):
         r'''
-        column = 'DATA' or 'FLAG'.
+        col_name = 'DATA', 'FLAG', 'CORRECTED', 'MODEL'...
         '''
         bl = self.num_bl
         first = first_baseline
@@ -189,4 +194,4 @@ class VisHDF5(h5py.File):
         num_ch = self['MAIN/DATA'].shape[-2]
         num_pol = self['MAIN/DATA'].shape[-1]
         for ts in range(n_timeslots):
-            self['MAIN/'+column][ts*bl+first:ts*bl+first+num_baselines,:,:] = x[ts,:,:,:]
+            self['MAIN/'+col_name][ts*bl+first:ts*bl+first+num_baselines,:,:] = x[ts,:,:,:]
