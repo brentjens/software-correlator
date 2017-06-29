@@ -4,6 +4,50 @@ import astropy.coordinates as acc
 import softwarecorrelator.coordinates as scc
 
 
+def antsol(vis_data_vect, vis_model_vect,
+                gain_solutions, antenna1_vect, antenna2_vect,
+                baseline_weights, alpha=0.5, epsilon=1e-5, refant=0,
+                max_iter=200):
+    vis_mask = vis_model_vect == 0.0
+    model = ma.array(vis_model_vect, mask=vis_mask)
+    vis_pointsource = ma.array(vis_data_vect/model, mask=vis_mask)
+    num_ant = len(gain_solutions)
+    w = baseline_weights
+    x_mat = numpy.zeros((num_ant, num_ant ), dtype=numpy.complex64)
+    w_mat = numpy.zeros((num_ant, num_ant ), dtype=numpy.float32)
+    ant1 = antenna1_vect
+    ant2 = antenna2_vect
+    for a1, a2, v, w in zip(ant1, ant2, vis_pointsource, w):
+        x_mat[a1, a2] = v
+        x_mat[a2, a1] = numpy.conj(v)
+        w_mat[a1, a2] = w
+        w_mat[a2, a1] = w
+        if a1 == a2:
+            w_mat[a1, a2] = 0
+
+    g_prev = gain_solutions
+    g_next = numpy.zeros((len(g_prev),), dtype=numpy.complex64)
+    iteration=0
+    mask = False
+    while True:
+        den = ma.array((w_mat*(numpy.abs(g_prev)**2)[numpy.newaxis, :]).sum(axis=1), mask=mask)
+        mask = den == 0.0
+        den.mask = mask
+        if mask.all():
+            break
+        num = ma.array((x_mat*w_mat*g_prev[numpy.newaxis,:]).sum(axis=1), mask=mask)
+        g_next = g_prev + alpha*(num/den - g_prev)
+        if norm(g_next-g_prev)/norm(g_next) < epsilon:
+            break
+        iteration += 1
+        g_prev = g_next
+        if iteration >= max_iter:
+            mask = mask+True
+            break
+    return ma.array(g_next/exp(1.j*angle(g_next[refant])), mask=mask)
+
+
+
 def baseline_matrix_m(positions_m):
     r'''
     Computes all baseline pairs between the provided positions.
@@ -393,7 +437,10 @@ class MatrixImager(object):
             self.min_baseline_lambda,
             self.max_baseline_lambda)
         if source_pqr_m is not None:
-            nf_predict_matrix = predict_matrix_near_field(ant_pqr_m, self.freq_hz, source_pqr_m)
+            nf_predict_matrix = predict_matrix_near_field(
+                ant_pqr_m, self.freq_hz, source_pqr_m,
+                min_baseline_lambda=self.min_baseline_lambda,
+                max_baseline_lambda=self.max_baseline_lambda)
             predict_matrix = numpy.append(predict_matrix,
                                           nf_predict_matrix, axis=1)
         self.predict_matrix = predict_matrix
