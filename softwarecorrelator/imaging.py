@@ -150,13 +150,19 @@ def make_imaging_matrix(uvw_m, freq_hz, l_rad, m_rad,
 
     u_m    = numpy.array(uvw_m[:, 0], dtype=numpy.float32)
     v_m    = numpy.array(uvw_m[:, 1], dtype=numpy.float32)
+    w_m    = numpy.array(uvw_m[:, 2], dtype=numpy.float32)
 
     
     grid_l, grid_m = numpy.meshgrid(l_rad, m_rad)
     grid_l = numpy.array(grid_l.ravel(), dtype=numpy.float32)[:, numpy.newaxis]
     grid_m = numpy.array(grid_m.ravel(), dtype=numpy.float32)[:, numpy.newaxis]
-        
-    mat    = numpy.exp(arg*(u_m[numpy.newaxis, :]*grid_l + v_m[numpy.newaxis, :]*grid_m))
+    grid_n_squared = 1 - grid_l**2 - grid_m**2
+    grid_n_squared[grid_n_squared < 0] = 0
+    grid_n = numpy.sqrt(grid_n_squared)
+
+    mat    = numpy.exp(arg*(u_m[numpy.newaxis, :]*grid_l \
+                            + v_m[numpy.newaxis, :]*grid_m \
+                            + w_m[numpy.newaxis, :]*grid_n))
 
     uv_lambda = numpy.sqrt(u_m**2 + v_m**2)*freq_hz/299792458.0
     bl_mask = numpy.ones(u_m.shape[0], dtype=numpy.int)
@@ -254,6 +260,89 @@ def make_predict_matrix(uvw_m, freq_hz, source_lmn_rad,
 
 
 
+
+
+def near_field_distances(pqr_ant, pqr_pixels):
+    r'''
+    Calculate distance to pixels from antenna positions.
+
+    **Parameters**
+
+    pqr_ant : numpy.array of floats
+        PQR coordinates of every antenna. Indices [ant, pqr]
+
+    pqr_pixels : numpy.array of floats
+        PQR coordinates of every pixel. Indices [pixel, pqr]
+
+
+    **Returns**
+
+    2D numpy.array of float distances [ant, pixel]
+
+
+    **Examples**
+
+    >>> nfd = near_field_distances(numpy.array([[1,2,3],[-2,-3,-1],[0,-2, +4]]),
+    ...                            numpy.array([[10,5,6],[-4,-3,-2]]))
+    >>> numpy.abs(nfd - numpy.array([[  9.94987437,   8.66025404], [ 16.03121954,   2.23606798], [ 12.36931688,   7.28010989]])).max() < 1e-6
+    True
+    '''
+    return numpy.array(numpy.linalg.norm(pqr_ant[:, numpy.newaxis, :]
+                                  - pqr_pixels[numpy.newaxis, :, :], axis=-1),
+                       dtype=numpy.float32)
+
+
+
+def predict_matrix_near_field(ant_pqr_m,
+                              freq_hz,
+                              source_pqr_m,
+                              phase_only=True,
+                              min_baseline_lambda=None,
+                              max_baseline_lambda=None):
+    r'''
+    **Examples**
+
+    >>> ant_pqr_m = numpy.array([[0,0,0], [10, 20, 0], [-5, -7, +2]])
+    >>> freq_hz = 250e6
+    >>> source_pqr_m = numpy.array([[0, 50, 10], [30, 0, -3]])
+    >>> predict_matrix_near_field(ant_pqr_m, freq_hz, source_pqr_m)
+    array([[ 1.00000000+0.j        ,  1.00000000+0.j        ],
+           [ 0.65453351+0.756033j  , -0.88592178-0.46383473j],
+           [-0.54493666-0.83847719j,  0.85561699-0.51760942j],
+           [ 1.00000000+0.j        ,  1.00000000+0.j        ],
+           [-0.99059576-0.13682133j, -0.51792449+0.85542631j],
+           [ 0.99999994+0.j        ,  0.99999994+0.j        ]])
+
+
+    '''
+    pqr_ant_m = numpy.array(ant_pqr_m, dtype=numpy.float32)
+    distances_pqr = near_field_distances(pqr_ant_m, source_pqr_m)
+    ant_gains = numpy.array(
+        numpy.exp(-2j*numpy.pi*freq_hz*distances_pqr/299792458.0),
+        dtype=numpy.complex64)
+    if not phase_only:
+        ant_gains /= distances_pqr
+    baseline_gains = ant_gains[:, numpy.newaxis, :]*numpy.conj(ant_gains[numpy.newaxis, :, :])
+    num_ant = ant_pqr_m.shape[0]
+    matrix_rows = []
+    uvw_m = acm_as_vector(baseline_matrix_m(ant_pqr_m), include_diag=True)
+    for row_id in range(num_ant):
+        for col_id in range(row_id, num_ant):
+            matrix_rows.append(baseline_gains[row_id, col_id, :])
+    mat = numpy.array(matrix_rows, dtype=numpy.complex64)
+    uv_lambda = numpy.sqrt(uvw_m[:,0]**2 + uvw_m[:,1]**2)*freq_hz/299792458.0
+    bl_mask = numpy.ones(uvw_m.shape[0], dtype=numpy.int)
+    if min_baseline_lambda is not None:
+        bl_mask *= uv_lambda >= min_baseline_lambda
+    if max_baseline_lambda is not None:
+        bl_mask *= uv_lambda <= max_baseline_lambda
+
+    return mat*bl_mask[:, numpy.newaxis]
+
+
+
+
+
 class MatrixImager(object):
     def __init__(self, uvw_m, num_pixels, freq_hz,
                  min_baseline_lambda=None,
@@ -295,14 +384,19 @@ class MatrixImager(object):
         return numpy.dot(mat, acm_vector).real.reshape((n, n))
 
 
-    def compute_predict_matrix(self, source_lmn_rad):
+    def compute_predict_matrix(self, source_lmn_rad, source_pqr_m=None, ant_pqr_m=None):
         r'''
         vis = matrix*source_fluxes
         '''
-        self.predict_matrix =  make_predict_matrix(
+        predict_matrix =  make_predict_matrix(
             self.uvw_m, self.freq_hz, source_lmn_rad,
             self.min_baseline_lambda,
             self.max_baseline_lambda)
+        if source_pqr_m is not None:
+            nf_predict_matrix = predict_matrix_near_field(ant_pqr_m, self.freq_hz, source_pqr_m)
+            predict_matrix = numpy.append(predict_matrix,
+                                          nf_predict_matrix, axis=1)
+        self.predict_matrix = predict_matrix
         return self.predict_matrix
 
 
