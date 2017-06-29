@@ -361,9 +361,9 @@ def flux_density_jy(source, freq_hz, epoch=2017.5, scale='baars'):
     scale = 'baars', 'perley', 'scaife-heald'
     '''
     if scale == 'baars':
-        logfreq = log10(freq_hz/1e6)
+        logfreq = numpy.log10(freq_hz/1e6)
         if source ==  'Cas A':
-            sec_correction = (1-(0.97 -0.30*log10(freq_hz/1e9))/100)
+            sec_correction = (1-(0.97 -0.30*numpy.log10(freq_hz/1e9))/100)
             if freq_hz < 300e6:
                 return (sec_correction**(epoch - 1980.0))*10**(5.745 + -0.770*logfreq)
             else:
