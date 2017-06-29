@@ -1,4 +1,5 @@
 import numpy
+import numpy.ma as ma
 from  astropy.coordinates.name_resolve import get_icrs_coordinates
 import astropy.coordinates as acc
 import softwarecorrelator.coordinates as scc
@@ -37,14 +38,14 @@ def antsol(vis_data_vect, vis_model_vect,
             break
         num = ma.array((x_mat*w_mat*g_prev[numpy.newaxis,:]).sum(axis=1), mask=mask)
         g_next = g_prev + alpha*(num/den - g_prev)
-        if norm(g_next-g_prev)/norm(g_next) < epsilon:
+        if numpy.linalg.norm(g_next-g_prev)/numpy.linalg.norm(g_next) < epsilon:
             break
         iteration += 1
         g_prev = g_next
         if iteration >= max_iter:
             mask = mask+True
             break
-    return ma.array(g_next/exp(1.j*angle(g_next[refant])), mask=mask)
+    return ma.array(g_next/numpy.exp(1.j*numpy.angle(g_next[refant])), mask=mask)
 
 
 
