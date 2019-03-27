@@ -69,7 +69,7 @@ class VisHDF5(h5py.File):
                             col_name, self.filename)
         except:
             logging.info('Creating MAIN/%s in %s',
-                         col_nameself.filename)
+                         col_name, self.filename)
             self.create_dataset('MAIN/'+col_name, self['MAIN/DATA'].shape, dtype=dtype,
                                 fillvalue=fillvalue)
 
